@@ -109,7 +109,7 @@ FLAG_LOWER_ANCHOR_WARN = 1  # used anchor < 0.95 for any >= p95 simulation
 FLAG_LOW_ACC_WARN = 2  # accuracy below threshold
 FLAG_NOT_COMPUTABLE_BG = 4  # block groups have no income data past median
 FLAG_POP_TOO_SMALL = 8  # population < 250, households < 100, household size >= 6
-FLAG_MISSING_DATA = 16  # thresholds exist but required mean(s) missing
+FLAG_MISSING_DATA = 16  # any missing data that prevents simulation
 FLAG_ALL_TOPCODED = 32  # p20 and up are all topcoded, no curve possible
 
 
@@ -148,8 +148,11 @@ def simulate_pareto_chunk(
   e[valid_draw] = (mu_s[valid_draw] - T_s[valid_draw]) / mu_s[valid_draw]
 
   for q in qs:
+    # safety check against simulating below anchor point
     if q < p0:
       continue
+
+    # actual Pareto curve
     R = (1.0 - p0) / (1.0 - q)
     logQ = logT + e * np.log(R)
 
@@ -413,27 +416,22 @@ def main() -> None:
         used_lower_anchor_for_p95 = (src95 != 0) & (src95 != 95)
         flags[used_lower_anchor_for_p95] |= FLAG_LOWER_ANCHOR_WARN
 
-        # compute per-row "worst" accuracy across the percentiles that actually got filled
-        q_labels = np.array(['p90', 'p95', 'p99', 'p999'], dtype=object)
+        # 2: accuracy below threshold (chooses the lowest accuracy among simulated anchor points)
+        # compute per-row "worst" accuracy
 
         acc_mat = np.vstack([acc_q[q] for q in QS_SIM])  # shape (4, n)
         acc_for_min = np.where(np.isfinite(acc_mat), acc_mat, np.inf)
 
-        worst_idx = np.argmin(acc_for_min, axis=0)
         worst_acc = np.min(acc_for_min, axis=0)
         has_acc = np.isfinite(worst_acc) & (worst_acc != np.inf)
-
-        sim_q_text = np.full(n, None, dtype=object)  # None -> NULL in DB via CSV blank
-        sim_q_text[has_acc] = q_labels[worst_idx[has_acc]]
 
         sim_accuracy = np.full(n, np.nan, dtype='float64')
         sim_accuracy[has_acc] = worst_acc[has_acc]
 
-        # --- 2: accuracy below threshold (worst-case across filled percentiles) ---
         low_acc = has_acc & (sim_accuracy < LOW_ACC_THRESH)
         flags[low_acc] |= FLAG_LOW_ACC_WARN
 
-        # --- 16: MISSING DATA OF ANY KIND ---
+        # 16: any missing data that prevented simulation (missing means or thresholds)
         # Define "computed_any" as: we successfully filled at least one simulated percentile.
         computed_any = np.zeros(n, dtype=bool)
         for q in QS_SIM:
@@ -442,13 +440,9 @@ def main() -> None:
         # Missing data means: nothing computed AND not all-coded.
         # (BG and too-small rows never enter this loop; they already have flags 4/8.)
         missing_data = (~computed_any) & (~all_coded)
-        flags[missing_data] |= (
-          FLAG_MISSING_DATA  # your 16; consider renaming constant to FLAG_MISSING_DATA
-        )
+        flags[missing_data] |= FLAG_MISSING_DATA
 
-        # NOTE: sim_q_int and sim_accuracy need to be written to SQL; see below.
-
-        # ---- Build out_df (nullable ints -> CSV -> COPY NULL '') ----
+        # very "fun" SQL
         out_df = pd.DataFrame(
           {
             'vintage': df['vintage'],
@@ -505,7 +499,7 @@ def main() -> None:
           ) as cp:
             cp.write(buf.getvalue())
 
-          # Your same UPSERT (unchanged)...
+          # UPSERT
           wcur.execute("""
             INSERT INTO viz.income_derived AS d (
               vintage, sumlevel, geoid,
