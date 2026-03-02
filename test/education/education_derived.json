@@ -1,0 +1,41 @@
+{
+  "vintage": "acs2024_5yr",
+  "rows": {
+    "01000US": {
+      "flags": 0,
+      "edu_education_index": 1.5237394,
+      "edu_education_index_lo90": 1.5211047,
+      "edu_education_index_hi90": 1.5263741,
+      "edu_years_of_school": 13.7307143,
+      "edu_years_of_school_lo90": 13.7191259,
+      "edu_years_of_school_hi90": 13.7423027
+    },
+    "04000US49": {
+      "flags": 0,
+      "edu_education_index": 1.5883,
+      "edu_education_index_lo90": 1.5837637,
+      "edu_education_index_hi90": 1.5928363,
+      "edu_years_of_school": 14.0408425,
+      "edu_years_of_school_lo90": 14.018686,
+      "edu_years_of_school_hi90": 14.062999
+    },
+    "15000US060855115021": {
+      "flags": 0,
+      "edu_education_index": 2.7953181,
+      "edu_education_index_lo90": 2.654424,
+      "edu_education_index_hi90": 2.9362123,
+      "edu_years_of_school": 20.6578631,
+      "edu_years_of_school_lo90": 19.7329082,
+      "edu_years_of_school_hi90": 21.5828181
+    },
+    "16000US4948830": {
+      "flags": 64,
+      "edu_education_index": null,
+      "edu_education_index_lo90": null,
+      "edu_education_index_hi90": null,
+      "edu_years_of_school": null,
+      "edu_years_of_school_lo90": null,
+      "edu_years_of_school_hi90": null
+    }
+  }
+}

@@ -5,10 +5,10 @@ import numpy as np
 import pandas as pd
 import psycopg
 from dotenv import load_dotenv
+from tqdm import tqdm
 
-QUERY_DROP_TABLE = 'DROP TABLE IF EXISTS viz.income_derived;'
 QUERY_CREATE_TABLE = """
-CREATE TABLE viz.income_derived (
+CREATE TABLE IF NOT EXISTS viz.income_derived (
   vintage           text NOT NULL,
   sumlevel          integer NOT NULL,
   geoid             text NOT NULL,
@@ -36,12 +36,13 @@ CREATE TABLE viz.income_derived (
 );
 """
 
+QUERY_RESET_TABLE = 'DELETE FROM viz.income_derived WHERE vintage = %s;'
+
 QUERY_POPULATE_TABLE = """
 INSERT INTO viz.income_derived (vintage, sumlevel, geoid)
 SELECT vintage, sumlevel, geoid
 FROM viz.income_base
-WHERE vintage = %s
-ON CONFLICT (vintage, sumlevel, geoid) DO NOTHING;
+WHERE vintage = %s;
 """
 
 QUERY_FLAG_GEOGRAPHIES_TOO_SMALL = """
@@ -60,14 +61,10 @@ WHERE d.vintage = %s
 """
 
 QUERY_FLAG_BLOCK_GROUPS = """
-UPDATE viz.income_derived d
-SET flags = (d.flags | %s)
-FROM viz.geoid_base g
-WHERE d.vintage = %s
-  AND d.vintage = g.vintage
-  AND d.sumlevel = g.sumlevel
-  AND d.geoid = g.geoid
-  AND d.sumlevel = 150;
+UPDATE viz.income_derived
+SET flags = flags | %s
+WHERE vintage = %s
+  AND sumlevel = 150;
 """
 
 QUERY_FETCH_ALL = """
@@ -89,9 +86,65 @@ SELECT
 FROM viz.income_derived d
 JOIN viz.income_base b
   ON b.vintage=d.vintage AND b.sumlevel=d.sumlevel AND b.geoid=d.geoid
-WHERE (d.flags & %s) = 0
-  AND d.vintage = %s
+WHERE d.vintage = %s
+  AND (d.flags & %s) = 0
   AND d.sumlevel != 150;
+"""
+
+QUERY_UPDATE_CREATE = """
+CREATE TEMP TABLE tmp_income_derived (
+  vintage           text NOT NULL,
+  sumlevel          integer NOT NULL,
+  geoid             text NOT NULL,
+
+  -- Derived/simulated values
+  hhi_sim_p90       bigint,
+  hhi_sim_p90_lo90  bigint,
+  hhi_sim_p90_hi90  bigint,
+  hhi_sim_p95       bigint,
+  hhi_sim_p95_lo90  bigint,
+  hhi_sim_p95_hi90  bigint,
+  hhi_sim_p99       bigint,
+  hhi_sim_p99_lo90  bigint,
+  hhi_sim_p99_hi90  bigint,
+  hhi_sim_p999      bigint,
+  hhi_sim_p999_lo90 bigint,
+  hhi_sim_p999_hi90 bigint,
+
+  -- Used for data quality purposes
+  hhi_sim_anchor    integer,
+  hhi_sim_acc       double precision,
+  flags             integer NOT NULL default 0
+) ON COMMIT DROP;
+"""
+
+QUERY_UPDATE_FROM_CSV = (
+  "COPY tmp_income_derived FROM STDIN WITH (FORMAT csv, HEADER true, NULL '');"
+)
+
+QUERY_UPDATE_TO_DB = """
+UPDATE viz.income_derived d
+SET
+  hhi_sim_p90       = t.hhi_sim_p90,
+  hhi_sim_p90_lo90  = t.hhi_sim_p90_lo90,
+  hhi_sim_p90_hi90  = t.hhi_sim_p90_hi90,
+  hhi_sim_p95       = t.hhi_sim_p95,
+  hhi_sim_p95_lo90  = t.hhi_sim_p95_lo90,
+  hhi_sim_p95_hi90  = t.hhi_sim_p95_hi90,
+  hhi_sim_p99       = t.hhi_sim_p99,
+  hhi_sim_p99_lo90  = t.hhi_sim_p99_lo90,
+  hhi_sim_p99_hi90  = t.hhi_sim_p99_hi90,
+  hhi_sim_p999      = t.hhi_sim_p999,
+  hhi_sim_p999_lo90 = t.hhi_sim_p999_lo90,
+  hhi_sim_p999_hi90 = t.hhi_sim_p999_hi90,
+
+  hhi_sim_anchor    = t.hhi_sim_anchor,
+  hhi_sim_acc       = t.hhi_sim_acc,
+  flags             = (d.flags | t.flags)
+FROM tmp_income_derived t
+WHERE d.vintage  = t.vintage
+  AND d.sumlevel = t.sumlevel
+  AND d.geoid    = t.geoid;
 """
 
 VINTAGE = 'acs2024_5yr'
@@ -195,8 +248,8 @@ def main() -> None:
   with psycopg.connect(db_url) as read_conn, psycopg.connect(db_url) as write_conn:
     # Setup on write conn
     with write_conn.cursor() as cur:
-      cur.execute(QUERY_DROP_TABLE)
       cur.execute(QUERY_CREATE_TABLE)
+      cur.execute(QUERY_RESET_TABLE, (VINTAGE,))
       cur.execute(QUERY_POPULATE_TABLE, (VINTAGE,))
       cur.execute(
         QUERY_FLAG_BLOCK_GROUPS,
@@ -219,8 +272,8 @@ def main() -> None:
       cur.execute(
         QUERY_FETCH_ALL,
         (
-          FLAG_POP_TOO_SMALL,
           VINTAGE,
+          FLAG_POP_TOO_SMALL,
         ),
       )
 
@@ -230,10 +283,14 @@ def main() -> None:
       colnames = [d[0] for d in cur.description]
 
       # create RNG seed
-      rng = np.random.default_rng(0)
+      rng = np.random.default_rng(1)
+
+      pbar = tqdm(desc='Processing rows')
 
       while True:
         rows = cur.fetchmany(CHUNK_SIZE)
+        pbar.update(len(rows))
+
         if not rows:
           break
 
@@ -467,78 +524,17 @@ def main() -> None:
         )
 
         with write_conn.cursor() as wcur:
-          wcur.execute("""
-                    CREATE TEMP TABLE tmp_income_derived (
-                      vintage text,
-                      sumlevel integer,
-                      geoid text,
-                      hhi_sim_p90 bigint,
-                      hhi_sim_p90_lo90 bigint,
-                      hhi_sim_p90_hi90 bigint,
-                      hhi_sim_p95 bigint,
-                      hhi_sim_p95_lo90 bigint,
-                      hhi_sim_p95_hi90 bigint,
-                      hhi_sim_p99 bigint,
-                      hhi_sim_p99_lo90 bigint,
-                      hhi_sim_p99_hi90 bigint,
-                      hhi_sim_p999 bigint,
-                      hhi_sim_p999_lo90 bigint,
-                      hhi_sim_p999_hi90 bigint,
-                      hhi_sim_anchor integer,
-                      hhi_sim_acc double precision,
-                      flags integer
-                    ) ON COMMIT DROP;
-                """)
+          wcur.execute(QUERY_UPDATE_CREATE)
 
           buf = io.StringIO()
           out_df.to_csv(buf, index=False, na_rep='')  # blanks for NULL
           buf.seek(0)
 
-          with wcur.copy(
-            "COPY tmp_income_derived FROM STDIN WITH (FORMAT csv, HEADER true, NULL '')"
-          ) as cp:
+          with wcur.copy(QUERY_UPDATE_FROM_CSV) as cp:
             cp.write(buf.getvalue())
 
-          # UPSERT
-          wcur.execute("""
-            INSERT INTO viz.income_derived AS d (
-              vintage, sumlevel, geoid,
-              hhi_sim_p90, hhi_sim_p90_lo90, hhi_sim_p90_hi90,
-              hhi_sim_p95, hhi_sim_p95_lo90, hhi_sim_p95_hi90,
-              hhi_sim_p99, hhi_sim_p99_lo90, hhi_sim_p99_hi90,
-              hhi_sim_p999, hhi_sim_p999_lo90, hhi_sim_p999_hi90,
-              hhi_sim_anchor, hhi_sim_acc, flags
-            )
-            SELECT
-              vintage, sumlevel, geoid,
-              hhi_sim_p90, hhi_sim_p90_lo90, hhi_sim_p90_hi90,
-              hhi_sim_p95, hhi_sim_p95_lo90, hhi_sim_p95_hi90,
-              hhi_sim_p99, hhi_sim_p99_lo90, hhi_sim_p99_hi90,
-              hhi_sim_p999, hhi_sim_p999_lo90, hhi_sim_p999_hi90,
-              hhi_sim_anchor, hhi_sim_acc, flags
-            FROM tmp_income_derived
-            ON CONFLICT (vintage, sumlevel, geoid) DO UPDATE
-            SET
-              hhi_sim_p90 = EXCLUDED.hhi_sim_p90,
-              hhi_sim_p90_lo90 = EXCLUDED.hhi_sim_p90_lo90,
-              hhi_sim_p90_hi90 = EXCLUDED.hhi_sim_p90_hi90,
-
-              hhi_sim_p95 = EXCLUDED.hhi_sim_p95,
-              hhi_sim_p95_lo90 = EXCLUDED.hhi_sim_p95_lo90,
-              hhi_sim_p95_hi90 = EXCLUDED.hhi_sim_p95_hi90,
-
-              hhi_sim_p99 = EXCLUDED.hhi_sim_p99,
-              hhi_sim_p99_lo90 = EXCLUDED.hhi_sim_p99_lo90,
-              hhi_sim_p99_hi90 = EXCLUDED.hhi_sim_p99_hi90,
-
-              hhi_sim_p999 = EXCLUDED.hhi_sim_p999,
-              hhi_sim_p999_lo90 = EXCLUDED.hhi_sim_p999_lo90,
-              hhi_sim_p999_hi90 = EXCLUDED.hhi_sim_p999_hi90,
-
-              hhi_sim_anchor = EXCLUDED.hhi_sim_anchor,
-              hhi_sim_acc = EXCLUDED.hhi_sim_acc,
-              flags = (d.flags | EXCLUDED.flags);
-            """)
+          # send temp rows to DB
+          wcur.execute(QUERY_UPDATE_TO_DB)
 
         write_conn.commit()
 
