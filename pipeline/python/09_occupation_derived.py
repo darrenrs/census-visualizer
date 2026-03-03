@@ -371,7 +371,7 @@ def compute_for_group(slot_container, rows):
     factor = 4.0 / valid_ratio.sum()
     se_ratio = np.sqrt(factor * np.sum((ratio_r - ratio) ** 2))
     moe_ratio = 1.645 * se_ratio
-    ratio_floor = 1.0 / float(len(slot_container[0]))
+    ratio_floor = 1.0
     ratio_ceil = float(len(slot_container[1]))
     ratio_lo = max(ratio - moe_ratio, ratio_floor)
     ratio_hi = min(ratio + moe_ratio, ratio_ceil)
