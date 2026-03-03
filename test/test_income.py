@@ -68,7 +68,7 @@ def conn():
 
 @pytest.fixture(scope='session')
 def golden():
-  p = Path(__file__).parent / 'income_derived.json'
+  p = Path(__file__).parent / 'test_income.json'
   if not p.exists():
     return {}
   data = json.loads(p.read_text())

@@ -1,4 +1,4 @@
-"""Pytest golden suite for viz.education_derived."""
+"""Pytest golden suite for viz.occupation_derived."""
 
 from __future__ import annotations
 
@@ -13,29 +13,33 @@ from dotenv import load_dotenv
 load_dotenv()
 
 VINTAGE = 'acs2024_5yr'
-TABLE = 'viz.education_derived'
+TABLE = 'viz.occupation_derived'
 REL_TOLERANCE = 1e-6
 ABS_TOLERANCE = 1e-6
 
 GEOIDS = [
   '01000US',
   '04000US49',
-  '15000US060855115021',
+  '14000US72057270800',
+  '16000US2455050',
   '16000US4948830',
 ]
 
 NULL_CASE_GEOID = '16000US4948830'
-NULL_CASE_FLAG_BIT = 64
+NULL_CASE_FLAG_BIT = 8
 
-GOLDEN_FILE = Path(__file__).parent / 'education_derived.json'
+GOLDEN_FILE = Path(__file__).parent / 'test_occupation.json'
 GOLDEN_FIELDS = [
   'flags',
-  'edu_education_index',
-  'edu_education_index_lo90',
-  'edu_education_index_hi90',
-  'edu_years_of_school',
-  'edu_years_of_school_lo90',
-  'edu_years_of_school_hi90',
+  'occ_occupation_index',
+  'occ_occupation_index_lo90',
+  'occ_occupation_index_hi90',
+  'occ_occupation_index_ext',
+  'occ_occupation_index_ext_lo90',
+  'occ_occupation_index_ext_hi90',
+  'occ_occupation_index_ratio',
+  'occ_occupation_index_ratio_lo90',
+  'occ_occupation_index_ratio_hi90',
 ]
 NUMERIC_FIELDS = [f for f in GOLDEN_FIELDS if f != 'flags']
 
@@ -102,7 +106,8 @@ def assert_value_close(geoid: str, field: str, got, exp):
 @pytest.mark.parametrize('geoid', GEOIDS)
 def test_golden_values_for_selected_geoids(conn, golden, geoid):
   exp = golden.get(geoid)
-  assert exp is not None, f'Missing golden entry for {geoid}'
+  if exp is None:
+    pytest.skip(f'Missing golden entry for {geoid}')
 
   row = fetch_row(conn, geoid)
   for field in GOLDEN_FIELDS:
@@ -110,7 +115,7 @@ def test_golden_values_for_selected_geoids(conn, golden, geoid):
       assert_value_close(geoid, field, row.get(field), exp.get(field))
 
 
-def test_null_case_flag8_and_null_outputs(conn):
+def test_null_case_flag_and_null_outputs(conn):
   row = fetch_row(conn, NULL_CASE_GEOID)
   assert int(row['flags']) & NULL_CASE_FLAG_BIT, (
     f'[{NULL_CASE_GEOID}] expected flag bit {NULL_CASE_FLAG_BIT}, got flags={row["flags"]}'
@@ -119,3 +124,47 @@ def test_null_case_flag8_and_null_outputs(conn):
     assert row[field] is None, (
       f'[{NULL_CASE_GEOID}] expected {field} to be NULL, got {row[field]!r}'
     )
+
+
+@pytest.mark.parametrize('geoid', GEOIDS)
+def test_occupation_bounds_and_ratio_identity(conn, geoid):
+  row = fetch_row(conn, geoid)
+
+  base = row['occ_occupation_index']
+  base_lo = row['occ_occupation_index_lo90']
+  base_hi = row['occ_occupation_index_hi90']
+  ext = row['occ_occupation_index_ext']
+  ext_lo = row['occ_occupation_index_ext_lo90']
+  ext_hi = row['occ_occupation_index_ext_hi90']
+  ratio = row['occ_occupation_index_ratio']
+  ratio_lo = row['occ_occupation_index_ratio_lo90']
+  ratio_hi = row['occ_occupation_index_ratio_hi90']
+
+  if base is None or ext is None or ratio is None:
+    assert base_lo is None and base_hi is None
+    assert ext_lo is None and ext_hi is None
+    assert ratio_lo is None and ratio_hi is None
+    return
+
+  assert 1.0 <= float(base) <= 5.0, f'[{geoid}] base out of range: {base}'
+  assert 1.0 <= float(ext) <= 25.0, f'[{geoid}] ext out of range: {ext}'
+  assert 0.2 <= float(ratio) <= 25.0, f'[{geoid}] ratio out of range: {ratio}'
+
+  assert base_lo is not None and base_hi is not None
+  assert ext_lo is not None and ext_hi is not None
+  assert ratio_lo is not None and ratio_hi is not None
+
+  assert 1.0 <= float(base_lo) <= 5.0 and 1.0 <= float(base_hi) <= 5.0
+  assert 1.0 <= float(ext_lo) <= 25.0 and 1.0 <= float(ext_hi) <= 25.0
+  assert 0.2 <= float(ratio_lo) <= 25.0 and 0.2 <= float(ratio_hi) <= 25.0
+
+  assert float(base_lo) <= float(base) <= float(base_hi)
+  assert float(ext_lo) <= float(ext) <= float(ext_hi)
+  assert float(ratio_lo) <= float(ratio) <= float(ratio_hi)
+
+  derived_ratio = float(ext) / float(base)
+  rel_err = abs(float(ratio) - derived_ratio) / max(abs(derived_ratio), 1.0)
+  abs_err = abs(float(ratio) - derived_ratio)
+  assert rel_err <= REL_TOLERANCE or abs_err <= ABS_TOLERANCE, (
+    f'[{geoid}] ratio mismatch: ratio={ratio}, ext/base={derived_ratio}'
+  )

@@ -1,0 +1,29 @@
+{
+  "vintage": "acs2024_5yr",
+  "rows": {
+    "01000US": {
+      "flags": 0,
+      "race_diversity_index": 0.6130614,
+      "race_diversity_index_lo90": 0.6129696,
+      "race_diversity_index_hi90": 0.6131531
+    },
+    "04000US49": {
+      "flags": 0,
+      "race_diversity_index": 0.4130915,
+      "race_diversity_index_lo90": 0.411862,
+      "race_diversity_index_hi90": 0.4143211
+    },
+    "15000US060855115021": {
+      "flags": 0,
+      "race_diversity_index": 0.3033722,
+      "race_diversity_index_lo90": 0.142655,
+      "race_diversity_index_hi90": 0.4640894
+    },
+    "16000US4948830": {
+      "flags": 8,
+      "race_diversity_index": null,
+      "race_diversity_index_lo90": null,
+      "race_diversity_index_hi90": null
+    }
+  }
+}
