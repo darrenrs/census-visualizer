@@ -6,7 +6,7 @@ SELECT
   g.geoid,
   g.name,
   g.sumlevel,
-  g.stusab,
+  g.stusab AS state_code,
 
   -- Table B01003: Total Population
   viz.clean_int(pop.b01003001)               AS total_population,
