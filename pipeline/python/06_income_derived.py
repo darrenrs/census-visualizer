@@ -159,7 +159,7 @@ P0_ORDER = [0.95, 0.80, 0.60, 0.40, 0.20]
 LOW_ACC_THRESH = 0.80
 
 FLAG_LOWER_ANCHOR_WARN = 1  # used anchor < 0.95 for any >= p95 simulation
-FLAG_LOW_ACC_WARN = 2  # accuracy below threshold
+FLAG_LOW_ACC_WARN = 2  # share of valid draws below threshold
 FLAG_NOT_COMPUTABLE_BG = 4  # block groups have no income data past median
 FLAG_POP_TOO_SMALL = 8  # population < 250, households < 100, household size >= 6
 FLAG_MISSING_DATA = 16  # any missing data that prevents simulation
@@ -183,20 +183,21 @@ def simulate_pareto_chunk(
   m = T.shape[0]
   out = {}
 
-  # Draw
+  # Randomly draw values for T and mu
   T_s = rng.normal(T, T_se, size=(sim_count, m))
   mu_s = rng.normal(mu, mu_se, size=(sim_count, m))
 
   valid_draw = np.isfinite(T_s) & np.isfinite(mu_s) & (T_s > 0) & (mu_s > 0) & (mu_s > T_s)
 
-  acc = valid_draw.mean(axis=0)
+  # Making sure that values don't become non-negative or mean is higher than quantile
+  valid_share = valid_draw.mean(axis=0)
   n_valid = valid_draw.sum(axis=0)
 
-  # Precompute pieces for log-space computation
+  # Prepare for log-space computation
   logT = np.full_like(T_s, np.nan, dtype='float64')
   logT[valid_draw] = np.log(T_s[valid_draw])
 
-  # e = (mu_s - T_s) / mu_s  in (0,1) for valid draws
+  # e = (mu_s - T_s) / mu_s = 1 / alpha in (0,1) for valid draws
   e = np.full_like(T_s, np.nan, dtype='float64')
   e[valid_draw] = (mu_s[valid_draw] - T_s[valid_draw]) / mu_s[valid_draw]
 
@@ -218,7 +219,70 @@ def simulate_pareto_chunk(
     lo = np.nanpercentile(sim, 5, axis=0)
     hi = np.nanpercentile(sim, 95, axis=0)
 
-    out[q] = (est, lo, hi, acc, n_valid)
+    out[q] = (est, lo, hi, valid_share, n_valid)
+
+  return out
+
+
+def simulate_pareto_between_quantiles_chunk(
+  T_lo: np.ndarray,
+  T_lo_se: np.ndarray,
+  T_hi: np.ndarray,
+  T_hi_se: np.ndarray,
+  p_lo: float,
+  p_hi: float,
+  qs: list[float],
+  rng: np.random.Generator,
+  sim_count: int,
+) -> dict:
+  """
+  Inputs are 1D arrays of length m (rows in this anchor group).
+  Returns dict[q] = (est, lo, hi, valid_share, n_valid) each length m.
+  """
+  m = T_lo.shape[0]
+  out = {}
+
+  # Randomly draw values for lower and upper quantiles
+  T_lo_s = rng.normal(T_lo, T_lo_se, size=(sim_count, m))
+  T_hi_s = rng.normal(T_hi, T_hi_se, size=(sim_count, m))
+
+  valid_draw = (
+    np.isfinite(T_lo_s) & np.isfinite(T_hi_s) & (T_lo_s > 0) & (T_hi_s > 0) & (T_hi_s > T_lo_s)
+  )
+
+  # Making sure that values don't become non-negative or upper quantile is not above lower quantile
+  valid_share = valid_draw.mean(axis=0)
+  n_valid = valid_draw.sum(axis=0)
+
+  # Prepare for log-space computation
+  logT = np.full_like(T_lo_s, np.nan, dtype='float64')
+  logT[valid_draw] = np.log(T_lo_s[valid_draw])
+
+  # e = 1 / alpha from the relationship between the two observed quantiles
+  # T_hi = T_lo * (((1 - p_lo) / (1 - p_hi)) ** e)
+  e = np.full_like(T_lo_s, np.nan, dtype='float64')
+  denom = np.log((1.0 - p_lo) / (1.0 - p_hi))
+  e[valid_draw] = np.log(T_hi_s[valid_draw] / T_lo_s[valid_draw]) / denom
+
+  for q in qs:
+    # safety check against simulating outside the observed quantile segment
+    if q < p_lo or q > p_hi:
+      continue
+
+    # actual Pareto curve within the segment
+    R = (1.0 - p_lo) / (1.0 - q)
+    logQ = logT + e * np.log(R)
+
+    # clamp exponents within 2^1024 to clear out Infinity
+    logQ = np.clip(logQ, -709.78, 709.78)
+
+    sim = np.exp(logQ)  # NaN where invalid_draw
+
+    est = np.nanmedian(sim, axis=0)
+    lo = np.nanpercentile(sim, 5, axis=0)
+    hi = np.nanpercentile(sim, 95, axis=0)
+
+    out[q] = (est, lo, hi, valid_share, n_valid)
 
   return out
 
@@ -295,14 +359,11 @@ def main() -> None:
           break
 
         df = pd.DataFrame(rows, columns=colnames)
-
         n = len(df)
-        if n == 0:
-          continue
 
         # extract source arrays
-        A = {}
-        for c in [
+        source_arrays = {}
+        for a in [
           'hhi_p95',
           'hhi_p95_se',
           'hhi_p80',
@@ -315,19 +376,18 @@ def main() -> None:
           'hhi_p20_se',
           'hhi_top5_mean',
           'hhi_top5_mean_se',
-          'hhi_q2_mean',
-          'hhi_q2_mean_se',
-          'hhi_q3_mean',
-          'hhi_q3_mean_se',
-          'hhi_q4_mean',
-          'hhi_q4_mean_se',
           'hhi_q5_mean',
           'hhi_q5_mean_se',
+          'hhi_q4_mean',
+          'hhi_q4_mean_se',
+          'hhi_q3_mean',
+          'hhi_q3_mean_se',
+          'hhi_q2_mean',
+          'hhi_q2_mean_se',
         ]:
-          A[c] = df[c].astype('float64').to_numpy()
+          source_arrays[a] = df[a].astype('float64').to_numpy()
 
-        base_flags = df['flags'].astype('int32').to_numpy()
-        flags = base_flags.copy()
+        flags = df['flags'].astype('int32').to_numpy().copy()
 
         # output arrays (estimate, lo90, hi90)
         est = {q: np.full(n, np.nan, dtype='float64') for q in QS_SIM}
@@ -337,44 +397,58 @@ def main() -> None:
         # track which anchor produced each q (95/80/60/40/20 as codes; 0 means missing)
         src = {q: np.zeros(n, dtype=np.uint16) for q in QS_SIM}
 
-        # track accuracy for the anchor that filled each q
+        # track valid share of draws for the anchor that filled each q
         acc_q = {q: np.full(n, np.nan, dtype='float64') for q in QS_SIM}
 
         # build and run anchors in priority order
         for p0 in P0_ORDER:
           # Determine T / T_se
           if p0 == 0.95:
-            T, T_se = A['hhi_p95'], A['hhi_p95_se']
-            mu, mu_se = A['hhi_top5_mean'], A['hhi_top5_mean_se']
+            T, T_se = source_arrays['hhi_p95'], source_arrays['hhi_p95_se']
+            mu, mu_se = source_arrays['hhi_top5_mean'], source_arrays['hhi_top5_mean_se']
             anchor_code = 95
           elif p0 == 0.80:
-            T, T_se = A['hhi_p80'], A['hhi_p80_se']
-            mu, mu_se = A['hhi_q5_mean'], A['hhi_q5_mean_se']
+            T, T_se = source_arrays['hhi_p80'], source_arrays['hhi_p80_se']
+            mu, mu_se = source_arrays['hhi_q5_mean'], source_arrays['hhi_q5_mean_se']
             anchor_code = 80
           elif p0 == 0.60:
-            T, T_se = A['hhi_p60'], A['hhi_p60_se']
-            mu = (A['hhi_q4_mean'] + A['hhi_q5_mean']) / 2.0
-            mu_se = np.sqrt(A['hhi_q4_mean_se'] ** 2 + A['hhi_q5_mean_se'] ** 2) / 2.0
+            T, T_se = source_arrays['hhi_p60'], source_arrays['hhi_p60_se']
+            mu = (source_arrays['hhi_q4_mean'] + source_arrays['hhi_q5_mean']) / 2.0
+            mu_se = (
+              np.sqrt(source_arrays['hhi_q4_mean_se'] ** 2 + source_arrays['hhi_q5_mean_se'] ** 2)
+              / 2.0
+            )
             anchor_code = 60
           elif p0 == 0.40:
-            T, T_se = A['hhi_p40'], A['hhi_p40_se']
-            mu = (A['hhi_q3_mean'] + A['hhi_q4_mean'] + A['hhi_q5_mean']) / 3.0
+            T, T_se = source_arrays['hhi_p40'], source_arrays['hhi_p40_se']
+            mu = (
+              source_arrays['hhi_q3_mean']
+              + source_arrays['hhi_q4_mean']
+              + source_arrays['hhi_q5_mean']
+            ) / 3.0
             mu_se = (
               np.sqrt(
-                A['hhi_q3_mean_se'] ** 2 + A['hhi_q4_mean_se'] ** 2 + A['hhi_q5_mean_se'] ** 2
+                source_arrays['hhi_q3_mean_se'] ** 2
+                + source_arrays['hhi_q4_mean_se'] ** 2
+                + source_arrays['hhi_q5_mean_se'] ** 2
               )
               / 3.0
             )
             anchor_code = 40
           else:  # p0 == 0.20
-            T, T_se = A['hhi_p20'], A['hhi_p20_se']
-            mu = (A['hhi_q2_mean'] + A['hhi_q3_mean'] + A['hhi_q4_mean'] + A['hhi_q5_mean']) / 4.0
+            T, T_se = source_arrays['hhi_p20'], source_arrays['hhi_p20_se']
+            mu = (
+              source_arrays['hhi_q2_mean']
+              + source_arrays['hhi_q3_mean']
+              + source_arrays['hhi_q4_mean']
+              + source_arrays['hhi_q5_mean']
+            ) / 4.0
             mu_se = (
               np.sqrt(
-                A['hhi_q2_mean_se'] ** 2
-                + A['hhi_q3_mean_se'] ** 2
-                + A['hhi_q4_mean_se'] ** 2
-                + A['hhi_q5_mean_se'] ** 2
+                source_arrays['hhi_q2_mean_se'] ** 2
+                + source_arrays['hhi_q3_mean_se'] ** 2
+                + source_arrays['hhi_q4_mean_se'] ** 2
+                + source_arrays['hhi_q5_mean_se'] ** 2
               )
               / 4.0
             )
@@ -434,22 +508,69 @@ def main() -> None:
             src[q][target] = anchor_code
             acc_q[q][target] = acc_vals_this[missing]
 
+        # Overwrite P90 for rows where simulated P95 < simulated P90
+        p80 = source_arrays['hhi_p80']
+        p80_se = source_arrays['hhi_p80_se']
+        p95 = source_arrays['hhi_p95']
+        p95_se = source_arrays['hhi_p95_se']
+
+        repair_p90_segment = (
+          (src[0.95] == 95)
+          & (src[0.90] == 80)
+          & (est[0.90] > est[0.95])
+          & np.isfinite(p80)
+          & np.isfinite(p80_se)
+          & np.isfinite(p95)
+          & np.isfinite(p95_se)
+          & (p80 > 0)
+          & (p80 < TOPCODE)
+          & (p80_se >= 0)
+          & (p95 > p80)
+          & (p95 < TOPCODE)
+          & (p95_se >= 0)
+        )
+
+        seg_idx = np.where(repair_p90_segment)[0]
+
+        if seg_idx.size > 0:
+          seg_out = simulate_pareto_between_quantiles_chunk(
+            T_lo=p80[seg_idx],
+            T_lo_se=p80_se[seg_idx],
+            T_hi=p95[seg_idx],
+            T_hi_se=p95_se[seg_idx],
+            p_lo=0.80,
+            p_hi=0.95,
+            qs=[0.90],
+            rng=rng,
+            sim_count=SIM_COUNT,
+          )
+
+          est_fix, lo_fix, hi_fix, valid_share_fix, _ = seg_out[0.90]
+
+          good = np.isfinite(est_fix)
+          target = seg_idx[good]
+
+          est[0.90][target] = est_fix[good]
+          lo[0.90][target] = lo_fix[good]
+          hi[0.90][target] = hi_fix[good]
+          acc_q[0.90][target] = valid_share_fix[good]
+
         anchor_used = np.zeros(n, dtype=np.uint16)
         for q in QS_SIM:
           anchor_used = np.maximum(anchor_used, src[q])
 
         # convert 0 -> NA (NULL in DB)
-        anchor_used_ser = pd.Series(
+        anchor_used_series = pd.Series(
           pd.array(np.where(anchor_used == 0, np.nan, anchor_used), dtype='Int64')
         )
 
         # set flags
         # 32: all top coded (extremely rare)
-        p95 = A['hhi_p95']
-        p80 = A['hhi_p80']
-        p60 = A['hhi_p60']
-        p40 = A['hhi_p40']
-        p20 = A['hhi_p20']
+        p95 = source_arrays['hhi_p95']
+        p80 = source_arrays['hhi_p80']
+        p60 = source_arrays['hhi_p60']
+        p40 = source_arrays['hhi_p40']
+        p20 = source_arrays['hhi_p20']
 
         all_T_present = (
           np.isfinite(p95)
@@ -475,8 +596,7 @@ def main() -> None:
 
         # 2: accuracy below threshold (chooses the lowest accuracy among simulated anchor points)
         # compute per-row "worst" accuracy
-
-        acc_mat = np.vstack([acc_q[q] for q in QS_SIM])  # shape (4, n)
+        acc_mat = np.vstack([acc_q[q] for q in QS_SIM])  # shape (QS_SIM, n)
         acc_for_min = np.where(np.isfinite(acc_mat), acc_mat, np.inf)
 
         worst_acc = np.min(acc_for_min, axis=0)
@@ -517,7 +637,7 @@ def main() -> None:
             'hhi_sim_p999': to_bigint_round(est[0.999]),
             'hhi_sim_p999_lo90': to_bigint_floor(lo[0.999]),
             'hhi_sim_p999_hi90': to_bigint_ceil(hi[0.999]),
-            'hhi_sim_anchor': anchor_used_ser,
+            'hhi_sim_anchor': anchor_used_series,
             'hhi_sim_acc': sim_accuracy,
             'flags': flags.astype('int32'),
           }
