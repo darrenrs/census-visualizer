@@ -1,0 +1,206 @@
+:root {
+  font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  line-height: 1.4;
+  font-weight: 400;
+  color: #122023;
+  background: #e9efe7;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-width: 320px;
+  width: 100%;
+  height: 100%;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-rows: 56px 1fr;
+  height: 100%;
+}
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  background: linear-gradient(90deg, #173b2f 0%, #1f5744 65%, #2b715b 100%);
+  color: #f3f8f0;
+  border-bottom: 1px solid #113326;
+}
+
+.brand {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.top-nav {
+  display: flex;
+  gap: 16px;
+  font-size: 0.9rem;
+  opacity: 0.95;
+}
+
+.top-nav a:hover {
+  opacity: 0.8;
+}
+
+.content-shell {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+}
+
+.map-container {
+  min-width: 0;
+  background: radial-gradient(
+    circle at 12% 12%,
+    #ecf5f1 0%,
+    #d4e4dc 40%,
+    #c3d6cc 100%
+  );
+  border-right: 1px solid #adc2b7;
+}
+
+.map-placeholder {
+  height: 100%;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  color: #1d3a32;
+}
+
+.map-placeholder p {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.map-placeholder small {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.detail-panel {
+  background: #f6fbf7;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.detail-panel h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.detail-panel p {
+  margin: 0 0 14px;
+  color: #466157;
+  font-size: 0.9rem;
+}
+
+.panel-section {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #d3e2da;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.panel-section h3 {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+}
+
+.panel-section p {
+  font-size: 0.7rem;
+}
+
+.input-group {
+  margin: 12px 0 14px;
+}
+
+.input-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #29473e;
+}
+
+.input-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.input-box {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #b8cbc1;
+  border-radius: 8px;
+  background: #fff;
+  color: #132621;
+  font-size: 0.9rem;
+  transition: border-color 120ms ease;
+}
+
+.input-box:focus {
+  outline: none;
+  border-color: #2b715b;
+  box-shadow: 0 0 0 2px rgba(43, 113, 91, 0.12);
+}
+
+.input-button {
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid #1f5744;
+  border-radius: 8px;
+  background: #1f5744;
+  color: #f4faf6;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.input-button:hover {
+  background: #1b4b3b;
+}
+
+@media (max-width: 960px) {
+  .content-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 220px;
+  }
+
+  .map-container {
+    border-right: 0;
+    border-bottom: 1px solid #adc2b7;
+  }
+}
+
+.map-container {
+  min-height: 0;
+}
+.map-canvas {
+  width: 100%;
+  height: 100%;
+}

@@ -1,5 +1,11 @@
-.env
-.venv/
-.pytest_cache/
-__pycache__/
+# config/data
+**/.env
 pipeline/vre/*/
+
+# cache
+.DS_Store
+.pytest_cache/
+.venv/
+__pycache__/
+dist/
+node_modules/

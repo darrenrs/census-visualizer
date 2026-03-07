@@ -1,64 +1,114 @@
 # Census Visualizer
 
-You're seeing an early commit of this website.
+An ETL pipeline + full-stack website that presents Census data and custom metrics with no fluff.
 
 ## Features
 
-- Robust data pipeline from raw Census Reporter ACS data into Sqlite
-- Precomputed margin of errors from variance replicate tables (if available) or analytic function
-- Node/Express backend, MapLibre frontend
+- Robust data pipeline from raw Census Reporter American Community Survey (ACS) data into Postgres offering support for more than 400,000 geographies
+- Derived metrics such as upper income percentiles using Pareto curves and normalized education, racial/ethnic diversity, and occupation indices
+- 90% margin of errors for all computable fields from Census variance replicate tables or Monte Carlo simulation
+- Node/Express backend, React/Vite frontend
 
-## Sumlevels
+## Build Instructions
 
-- 010: Nation
-- 040: State
-- 050: County
+### Running the Pipeline
+
+(This will be integrated into one Makefile soon. From a clean slate this entire process will take about 30 min to complete.)
+
+1. Ensure Postgres is installed and the [Census Reporter ACS data dump](https://censusreporter.tumblr.com/post/73727555158/easier-access-to-acs-data/amp) has been loaded into a new schema.
+2. Run `pipeline/vre/download_vre_tables.py`
+3. Run each of the scripts in `pipeline/sql` and `pipeline/python` in order based on their number.
+
+### Running the Website
+
+1. `cp .env.example .env` and set values
+2. `cd web/server`
+3. `npm install`
+4. `npm run dev`
+5. `cd web/client`
+6. `npm install`
+7. `npm run dev`
+
+#### API
+
+The Express API currently exposes:
+
+- `GET /v1/geographies`
+  - Gets list and count of all geography summary levels
+- `GET /v1/geography/:geoid`
+  - Query params:
+    - `geoid` (required)
+  - Response keys:
+    - `geography`, `core`, `income`, `education`, `diversity`, `occupation`
+    - `geography` and `core` are always available. The others may be `null` for certain geographies.
+
+## Metrics
+
+Metrics are listed with their ACS table if applicable. Flags are used to describe data quality errors.
+
+### Geography
+
+- GEOID (Primary Key)
+- Vintage (e.g., `acs2024_5yr`)
+- Summary Level (integer)
+- Name
+- State Code (`stusab`)
+
+#### Summary Levels
+
+- 010: United States of America
+- 040: State or State-equivalent
+- 050: County or County-equivalent
 - 060: County Subdivision
 - 140: Tract
 - 150: Block Group
 - 160: Place
-- 310: MSA
-- 500: Congressional District
-- 860: Zip Code
+- 310: Metropolitan or Micropolitan Statistical Area
+- 500: Congressional District (119th Congress)
+- 860: Zip Code Tabulation Area
 
-## Metrics
+### Core Demographics
 
-### Descriptive
+- Total Population (B01003)
+- Total Households (B11001)
+- Average Household Size (B25010)
 
-- GEOID (PK)
-- Name
-- Summary Level
-- Stusab (State/Territory Code)
-- Population (B01003)
-- Households (B11001)
-
-### Income Tail Distribution
+### Income
 
 _Household income percentile extremes and confidence intervals estimated by Pareto distribution function._
 
 - Median Household Income (B19013)
-- Household Income Thresholds P20, P40, P60, P80, P95 (B19080)
-- Mean Household Income of Quintiles 1, 2, 3, 4, 5% and top 5% (B19081)
-- Share of Aggregate Household Income by Quintiles 1, 2, 3, 4, 5, and top 5% (B19082)
+- Household Income Thresholds at percentiles 20, 40, 60, 80, and 95 (B19080)
+  - _Census topcodes values above $250,000 as "250001"_
+- Mean Household Income of quintiles 1, 2, 3, 4, 5 and top 5% (B19081)
+  - _These values are not topcoded_
+- Gini Index of Income Inequality (B19083)
 
-### Gini Index
+### Education
 
-_Measure of income inequality. Confidence intervals provided._
+_Normalized index in the range 0-100, plus estimated years of schooling. Confidence intervals derived from Variance Replicate Estimate tables._
 
-- Gini Index (B19083)
-
-### Education Index
-
-_Normalized index in the range 0-100, plus estimated years of schooling. Confidence intervals derived from Variance Replicate Tables._
-
-- Educational Attainment (B15002)
-
-### Occupational Diversity
-
-_Confidence intervals derived from Variance Replicate Tables._
-
-- Five High Level Groups for Occupations (C24010)
+- Educational Attainment by Sex (B15002)
 
 ### Racial/Ethnic Diversity
 
-- Categories (B03002)
+_Normalized index in the range 0-100. Confidence intervals derived from Variance Replicate Estimate tables._
+
+- Hispanic or Latino Origin by Race (B03002)
+
+### Occupational Diversity
+
+_Five root occupational groups, twenty-five leaf occupational groups, ratio of basic to extended index. Confidence intervals derived from Variance Replicate Estimate tables._
+
+- Detailed Occupation Breakdown (C24010)
+
+## Todo (2026-03-07)
+
+- Improve CSS, make mobile responsive, and finish derived metrics
+- Add custom GIS tiles
+- Delete unneeded columns in ETL pipeline (e.g., income shares)
+
+## Acknowledgements
+
+- U.S. Census Bureau
+- Census Reporter
