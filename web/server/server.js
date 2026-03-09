@@ -7,16 +7,12 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 1) Try standard cwd .env (works when running from web/)
-dotenv.config();
-// 2) Fallback to repo-root .env
-if (!process.env.DATABASE_URL) {
-  dotenv.config({ path: path.resolve(__dirname, "../../.env") });
-}
+// Load a single repo-root .env for local development.
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
-    "DATABASE_URL is not set. Add it to web/.env or repo-root .env before starting the server.",
+    "DATABASE_URL is not set. Add it to repo-root .env before starting the server.",
   );
 }
 
@@ -30,7 +26,8 @@ const pool = new Pool({
 });
 
 const PORT = Number(process.env.PORT_SERVER || 3000);
-const DEFAULT_VINTAGE = process.env.DEFAULT_VINTAGE || "acs2024_5yr";
+const DEFAULT_VINTAGE =
+  process.env.DEFAULT_VINTAGE || process.env.VINTAGE || "acs2024_5yr";
 
 const QUERY_GEOGRAPHIES = `
 WITH all_sumlevels AS (
@@ -188,5 +185,5 @@ app.use((err, _req, res, _next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`API listening on http://localhost:${PORT}`);
+  console.log(`API listening on http://127.0.0.1:${PORT}`);
 });

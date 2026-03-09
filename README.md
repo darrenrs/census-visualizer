@@ -28,6 +28,19 @@ An ETL pipeline + full-stack website that presents Census data and custom metric
 5. `cd web/client`
 6. `npm install`
 7. `npm run dev`
+8. Open `http://127.0.0.1:5173`
+
+Default local URLs:
+
+- Frontend: `http://127.0.0.1:5173`
+- API: `http://127.0.0.1:3000`
+
+Port/base path override knobs in root `.env`:
+
+- `PORT_SERVER` for API server
+- `PORT_CLIENT` for Vite dev server
+- `VITE_BASE_PATH` for frontend mount path
+- `VITE_API_BASE` for browser API base path
 
 #### API
 
@@ -102,11 +115,11 @@ _Five root occupational groups, twenty-five leaf occupational groups, ratio of b
 
 - Detailed Occupation Breakdown (C24010)
 
-## Todo (2026-03-07)
+## Todo (2026-03-08)
 
-- Improve CSS, make mobile responsive, and finish derived metrics
-- Add custom GIS tiles
-- Delete unneeded columns in ETL pipeline (e.g., income shares)
+- Add flags/confidence warnings in frontend
+- Add custom GIS tiles and geographies
+- Make vintage name completely non-hardcoded
 
 ## Acknowledgements
 

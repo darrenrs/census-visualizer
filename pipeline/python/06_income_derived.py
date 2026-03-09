@@ -155,15 +155,16 @@ TOPCODE = 250_001
 BOTTOMCODE = 2499
 
 QS_SIM = [0.90, 0.95, 0.99, 0.999]
-P0_ORDER = [0.95, 0.80, 0.60, 0.40, 0.20]
+P0_ORDER = [0.95, 0.80]
 LOW_ACC_THRESH = 0.80
 
-FLAG_LOWER_ANCHOR_WARN = 1  # used anchor < 0.95 for any >= p95 simulation
-FLAG_LOW_ACC_WARN = 2  # share of valid draws below threshold
+FLAG_LOWER_ANCHOR_WARN = 1  # used means anchor instead of quantile anchor (P80 and P95 topcoded)
+FLAG_LOW_ACC_WARN = 2  # share of valid draws is below threshold
 FLAG_NOT_COMPUTABLE_BG = 4  # block groups have no income data past median
 FLAG_POP_TOO_SMALL = 8  # population < 250, households < 100, household size >= 6
 FLAG_MISSING_DATA = 16  # any missing data that prevents simulation
 FLAG_ALL_TOPCODED = 32  # p20 and up are all topcoded, no curve possible
+FLAG_SIM_P95_LT_SIM_P90 = 64  # simulated p95 was less than simulated p90 due to two different tails
 
 
 def simulate_pareto_chunk(
@@ -287,6 +288,90 @@ def simulate_pareto_between_quantiles_chunk(
   return out
 
 
+def simulate_pareto_from_means_chunk(
+  mu80: np.ndarray,
+  mu80_se: np.ndarray,
+  mu95: np.ndarray,
+  mu95_se: np.ndarray,
+  qs: list[float],
+  rng: np.random.Generator,
+  sim_count: int,
+) -> dict:
+  """
+  Inputs are 1D arrays of length m (rows in this anchor group).
+  Returns dict[q] = (est, lo, hi, valid_share, n_valid) each length m.
+
+  Fits a Pareto tail above the 80th percentile using:
+    mu80 = E[X | X > P80]
+    mu95 = E[X | X > P95]
+
+  where:
+    alpha = ln(4) / ln(mu95 / mu80)
+    P80   = (1 - 1/alpha) * mu80
+
+  Note: in testing this was globally about 7x worse than the quantile-based algorithm, but it is
+  much more necessary for affluent geographies where at least 20% of households are earning over
+  $250k a year
+  """
+  m = mu80.shape[0]
+  out = {}
+
+  # Randomly draw values for top-20 and top-5 means
+  mu80_s = rng.normal(mu80, mu80_se, size=(sim_count, m))
+  mu95_s = rng.normal(mu95, mu95_se, size=(sim_count, m))
+
+  # Need:
+  #   mu80 > 0
+  #   mu95 > mu80
+  #   mu95 / mu80 < 4  (so alpha > 1 and implied P80 > 0)
+  valid_draw = (
+    np.isfinite(mu80_s)
+    & np.isfinite(mu95_s)
+    & (mu80_s > 0)
+    & (mu95_s > mu80_s)
+    & (mu95_s < 4.0 * mu80_s)
+  )
+
+  # Share of valid draws
+  valid_share = valid_draw.mean(axis=0)
+  n_valid = valid_draw.sum(axis=0)
+
+  # e = 1 / alpha
+  e = np.full_like(mu80_s, np.nan, dtype='float64')
+  e[valid_draw] = np.log(mu95_s[valid_draw] / mu80_s[valid_draw]) / np.log(4.0)
+
+  # implied latent P80
+  T_s = np.full_like(mu80_s, np.nan, dtype='float64')
+  T_s[valid_draw] = mu80_s[valid_draw] * (1.0 - e[valid_draw])
+
+  # ensure implied threshold is positive
+  valid_draw = valid_draw & np.isfinite(T_s) & (T_s > 0)
+
+  logT = np.full_like(T_s, np.nan, dtype='float64')
+  logT[valid_draw] = np.log(T_s[valid_draw])
+
+  for q in qs:
+    # means-only tail is defined above 0.80
+    if q < 0.80:
+      continue
+
+    R = 0.20 / (1.0 - q)
+    logQ = logT + e * np.log(R)
+
+    # clamp exponents within float64 range
+    logQ = np.clip(logQ, -709.78, 709.78)
+
+    sim = np.exp(logQ)  # NaN where invalid_draw
+
+    est = np.nanmedian(sim, axis=0)
+    lo = np.nanpercentile(sim, 5, axis=0)
+    hi = np.nanpercentile(sim, 95, axis=0)
+
+    out[q] = (est, lo, hi, valid_share, n_valid)
+
+  return out
+
+
 # nullable-int conversions that preserve NA
 def to_bigint_round(x: np.ndarray) -> pd.Series:
   return pd.Series(pd.array(np.rint(x), dtype='Int64'))
@@ -394,7 +479,7 @@ def main() -> None:
         lo = {q: np.full(n, np.nan, dtype='float64') for q in QS_SIM}
         hi = {q: np.full(n, np.nan, dtype='float64') for q in QS_SIM}
 
-        # track which anchor produced each q (95/80/60/40/20 as codes; 0 means missing)
+        # track which anchor produced each q (95/80/1 as codes; 0 means missing)
         src = {q: np.zeros(n, dtype=np.uint16) for q in QS_SIM}
 
         # track valid share of draws for the anchor that filled each q
@@ -411,48 +496,9 @@ def main() -> None:
             T, T_se = source_arrays['hhi_p80'], source_arrays['hhi_p80_se']
             mu, mu_se = source_arrays['hhi_q5_mean'], source_arrays['hhi_q5_mean_se']
             anchor_code = 80
-          elif p0 == 0.60:
-            T, T_se = source_arrays['hhi_p60'], source_arrays['hhi_p60_se']
-            mu = (source_arrays['hhi_q4_mean'] + source_arrays['hhi_q5_mean']) / 2.0
-            mu_se = (
-              np.sqrt(source_arrays['hhi_q4_mean_se'] ** 2 + source_arrays['hhi_q5_mean_se'] ** 2)
-              / 2.0
-            )
-            anchor_code = 60
-          elif p0 == 0.40:
-            T, T_se = source_arrays['hhi_p40'], source_arrays['hhi_p40_se']
-            mu = (
-              source_arrays['hhi_q3_mean']
-              + source_arrays['hhi_q4_mean']
-              + source_arrays['hhi_q5_mean']
-            ) / 3.0
-            mu_se = (
-              np.sqrt(
-                source_arrays['hhi_q3_mean_se'] ** 2
-                + source_arrays['hhi_q4_mean_se'] ** 2
-                + source_arrays['hhi_q5_mean_se'] ** 2
-              )
-              / 3.0
-            )
-            anchor_code = 40
-          else:  # p0 == 0.20
-            T, T_se = source_arrays['hhi_p20'], source_arrays['hhi_p20_se']
-            mu = (
-              source_arrays['hhi_q2_mean']
-              + source_arrays['hhi_q3_mean']
-              + source_arrays['hhi_q4_mean']
-              + source_arrays['hhi_q5_mean']
-            ) / 4.0
-            mu_se = (
-              np.sqrt(
-                source_arrays['hhi_q2_mean_se'] ** 2
-                + source_arrays['hhi_q3_mean_se'] ** 2
-                + source_arrays['hhi_q4_mean_se'] ** 2
-                + source_arrays['hhi_q5_mean_se'] ** 2
-              )
-              / 4.0
-            )
-            anchor_code = 20
+          else:
+            # for p0 < 0.80, run the means algorithm
+            continue
 
           # choose qs for this simulation; no simulating a lower q than current anchor percentile
           qs_here = [q for q in QS_SIM if q >= p0]
@@ -508,6 +554,66 @@ def main() -> None:
             src[q][target] = anchor_code
             acc_q[q][target] = acc_vals_this[missing]
 
+        # Means-only fallback for rows where BOTH P95 and P80 are topcoded.
+        # This only fills rows/quantiles that are still missing after the normal anchor loop.
+        mu80 = source_arrays['hhi_q5_mean']
+        mu80_se = source_arrays['hhi_q5_mean_se']
+        mu95 = source_arrays['hhi_top5_mean']
+        mu95_se = source_arrays['hhi_top5_mean_se']
+        p80 = source_arrays['hhi_p80']
+        p95 = source_arrays['hhi_p95']
+
+        need_means_fallback = (p80 == TOPCODE) & (p95 == TOPCODE)
+
+        # only bother if at least one target quantile is still missing
+        still_missing_any = np.zeros(n, dtype=bool)
+        for q in QS_SIM:
+          still_missing_any |= np.isnan(est[q])
+
+        row_ok = (
+          need_means_fallback
+          & still_missing_any
+          & np.isfinite(mu80)
+          & np.isfinite(mu80_se)
+          & np.isfinite(mu95)
+          & np.isfinite(mu95_se)
+          & (mu80 > 0)
+          & (mu80_se >= 0)
+          & (mu95 > mu80)
+          & (mu95_se >= 0)
+          & (mu95 < 4.0 * mu80)
+        )
+
+        rows_idx = np.where(row_ok)[0]
+
+        if rows_idx.size > 0:
+          sim_out = simulate_pareto_from_means_chunk(
+            mu80=mu80[rows_idx],
+            mu80_se=mu80_se[rows_idx],
+            mu95=mu95[rows_idx],
+            mu95_se=mu95_se[rows_idx],
+            qs=QS_SIM,
+            rng=rng,
+            sim_count=SIM_COUNT,
+          )
+
+          for q in QS_SIM:
+            if q not in sim_out:
+              continue
+
+            est_this, lo_this, hi_this, acc_vals_this, _ = sim_out[q]
+
+            missing = np.isnan(est[q][rows_idx]) & np.isfinite(est_this)
+            if not np.any(missing):
+              continue
+
+            target = rows_idx[missing]
+            est[q][target] = est_this[missing]
+            lo[q][target] = lo_this[missing]
+            hi[q][target] = hi_this[missing]
+            src[q][target] = 1  # means-implied latent P80
+            acc_q[q][target] = acc_vals_this[missing]
+
         # Overwrite P90 for rows where simulated P95 < simulated P90
         p80 = source_arrays['hhi_p80']
         p80_se = source_arrays['hhi_p80_se']
@@ -529,6 +635,9 @@ def main() -> None:
           & (p95 < TOPCODE)
           & (p95_se >= 0)
         )
+
+        # had to attempt a tail repair (NOT a guarantee)
+        flags[repair_p90_segment] |= FLAG_SIM_P95_LT_SIM_P90
 
         seg_idx = np.where(repair_p90_segment)[0]
 
@@ -589,10 +698,9 @@ def main() -> None:
         )
         flags[all_coded] |= FLAG_ALL_TOPCODED
 
-        # 1: used anchor <0.95 for any p95 simulation
-        src95 = src[0.95]  # 95/80/60/40/20/0
-        used_lower_anchor_for_p95 = (src95 != 0) & (src95 != 95)
-        flags[used_lower_anchor_for_p95] |= FLAG_LOWER_ANCHOR_WARN
+        # 1: used means anchor instead of quantile anchor
+        used_means_for_p95 = src[0.95] == 1
+        flags[used_means_for_p95] |= FLAG_LOWER_ANCHOR_WARN
 
         # 2: accuracy below threshold (chooses the lowest accuracy among simulated anchor points)
         # compute per-row "worst" accuracy

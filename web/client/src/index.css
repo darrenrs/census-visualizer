@@ -1,9 +1,22 @@
 :root {
-  font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  --font-sans: "Outfit Variable", sans-serif;
+  --font-mono: "Spline Sans Mono Variable", monospace;
+  --bg-app: #e9efe7;
+  --bg-panel: #f6fbf7;
+  --bg-card: #ffffff;
+  --text-main: #122023;
+  --text-muted: #466157;
+  --text-subtle: #6a7f76;
+  --accent: #32856b;
+  --accent-dark: #1f5744;
+  --border-soft: #adc2b7;
+  --border-card: #d3e2da;
+  --focus-ring: rgba(43, 113, 91, 0.12);
+
   line-height: 1.4;
   font-weight: 400;
-  color: #122023;
-  background: #e9efe7;
+  color: var(--text-main);
+  background: var(--bg-app);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -21,6 +34,14 @@ body,
   min-width: 320px;
   width: 100%;
   height: 100%;
+  font-family: var(--font-sans);
+}
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
 }
 
 a {
@@ -39,13 +60,13 @@ a {
   align-items: center;
   justify-content: space-between;
   padding: 0 18px;
-  background: linear-gradient(90deg, #173b2f 0%, #1f5744 65%, #2b715b 100%);
+  background: linear-gradient(90deg, var(--accent-dark) 0%, var(--accent) 100%);
   color: #f3f8f0;
-  border-bottom: 1px solid #113326;
+  border-bottom: 1px solid var(--accent-dark);
 }
 
 .brand {
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -53,7 +74,7 @@ a {
 .top-nav {
   display: flex;
   gap: 16px;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   opacity: 0.95;
 }
 
@@ -64,85 +85,130 @@ a {
 .content-shell {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: minmax(0, 1fr) clamp(380px, 32vw, 460px);
 }
 
 .map-container {
   min-width: 0;
-  background: radial-gradient(
-    circle at 12% 12%,
-    #ecf5f1 0%,
-    #d4e4dc 40%,
-    #c3d6cc 100%
-  );
-  border-right: 1px solid #adc2b7;
-}
-
-.map-placeholder {
-  height: 100%;
-  display: grid;
-  place-content: center;
-  text-align: center;
-  color: #1d3a32;
-}
-
-.map-placeholder p {
-  margin: 0;
-  font-size: 1.2rem;
-  font-weight: 700;
-}
-
-.map-placeholder small {
-  margin-top: 6px;
-  font-size: 0.85rem;
-  opacity: 0.75;
+  border-right: 1px solid var(--border-soft);
 }
 
 .detail-panel {
-  background: #f6fbf7;
+  background: var(--bg-panel);
   padding: 16px;
   overflow-y: auto;
 }
 
 .detail-panel h2 {
   margin: 0 0 8px;
-  font-size: 1rem;
+  font-size: 1.08rem;
+  line-height: 1.25;
 }
 
 .detail-panel p {
   margin: 0 0 14px;
-  color: #466157;
-  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.detail-row {
+  margin-bottom: 18px;
 }
 
 .panel-section {
   margin-top: 12px;
-  padding: 12px;
-  border: 1px solid #d3e2da;
+  padding: 14px;
+  border: 1px solid var(--border-card);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--bg-card);
 }
 
 .panel-section h3 {
   margin: 0 0 6px;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+  line-height: 1.3;
 }
 
 .panel-section p {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.value-section {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.value-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+  padding: 10px 8px;
+  border: 1px solid var(--border-card);
+  border-radius: 8px;
+  background: var(--bg-panel);
+}
+
+.value-label {
+  font-size: 0.9rem;
+  color: var(--text-main);
+}
+
+.panel-section .main-value,
+.panel-section .margin-of-error {
+  font-family: var(--font-mono);
+}
+
+.panel-section .main-value {
+  font-size: 1.2rem;
+  font-weight: 650;
+  line-height: 1.2;
+  color: var(--accent-dark);
+}
+
+.panel-section .margin-of-error {
   font-size: 0.7rem;
+  color: var(--text-subtle);
+  line-height: 1.35;
 }
 
-.input-group {
-  margin: 12px 0 14px;
+.income-percentile-table {
+  width: 100%;
+  margin: 8px 0 14px;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: 0.88rem;
 }
 
-.input-label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 0.8rem;
+.income-percentile-table th:first-child,
+.income-percentile-table td:first-child {
+  width: 15%;
+}
+
+.income-percentile-table th,
+.income-percentile-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--border-card);
+  text-align: left;
+}
+
+.income-percentile-table th {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.income-percentile-table .pr-cell {
+  color: var(--accent-dark);
   font-weight: 700;
-  letter-spacing: 0.01em;
-  color: #29473e;
+}
+
+.income-percentile-table .value-cell {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
 }
 
 .input-row {
@@ -155,51 +221,56 @@ a {
   width: 100%;
   height: 38px;
   padding: 0 10px;
-  border: 1px solid #b8cbc1;
+  border: 1px solid var(--border-soft);
   border-radius: 8px;
-  background: #fff;
-  color: #132621;
+  background: var(--bg-card);
+  color: var(--text-main);
   font-size: 0.9rem;
   transition: border-color 120ms ease;
 }
 
 .input-box:focus {
   outline: none;
-  border-color: #2b715b;
-  box-shadow: 0 0 0 2px rgba(43, 113, 91, 0.12);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .input-button {
   height: 38px;
   padding: 0 12px;
-  border: 1px solid #1f5744;
+  border: 1px solid var(--accent-dark);
   border-radius: 8px;
-  background: #1f5744;
+  background: var(--accent-dark);
   color: #f4faf6;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
 }
 
 .input-button:hover {
-  background: #1b4b3b;
+  background: var(--accent);
 }
 
 @media (max-width: 960px) {
   .content-shell {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr 220px;
+    grid-template-rows: minmax(220px, 50vh) 1fr;
   }
 
   .map-container {
     border-right: 0;
-    border-bottom: 1px solid #adc2b7;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .value-section {
+    grid-template-columns: 1fr;
   }
 }
 
 .map-container {
   min-height: 0;
 }
+
 .map-canvas {
   width: 100%;
   height: 100%;

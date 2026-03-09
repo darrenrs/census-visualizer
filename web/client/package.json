@@ -7,9 +7,13 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/outfit": "^5.2.8",
+    "@fontsource-variable/spline-sans-mono": "^5.2.8",
     "@tanstack/react-query": "^5.90.21",
     "maplibre-gl": "^5.19.0",
     "react": "^19.2.0",
@@ -26,6 +30,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "prettier": "^3.8.1",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",
     "vite": "^7.3.1"
