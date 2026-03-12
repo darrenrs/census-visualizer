@@ -156,15 +156,16 @@ BOTTOMCODE = 2499
 
 QS_SIM = [0.90, 0.95, 0.99, 0.999]
 P0_ORDER = [0.95, 0.80]
-LOW_ACC_THRESH = 0.80
+LOW_VALID_THRESH = 0.80
 
-FLAG_LOWER_ANCHOR_WARN = 1  # used means anchor instead of quantile anchor (P80 and P95 topcoded)
-FLAG_LOW_ACC_WARN = 2  # share of valid draws is below threshold
-FLAG_NOT_COMPUTABLE_BG = 4  # block groups have no income data past median
-FLAG_POP_TOO_SMALL = 8  # population < 250, households < 100, household size >= 6
+FLAG_POP_TOO_SMALL = 1  # population < 250, households < 100, household size >= 6
+FLAG_LOWER_ANCHOR_WARN = 2  # used means anchor instead of quantile anchor (P80 and P95 topcoded)
+FLAG_LOW_VALID_WARN = 4  # share of valid draws is below threshold
+FLAG_NOT_COMPUTABLE_BG = 8  # block groups have no income data past median
 FLAG_MISSING_DATA = 16  # any missing data that prevents simulation
-FLAG_ALL_TOPCODED = 32  # p20 and up are all topcoded, no curve possible
+FLAG_ALL_BOTTOMCODED = 32  # all observed percentiles are bottomcoded, no curve possible
 FLAG_SIM_P95_LT_SIM_P90 = 64  # simulated p95 was less than simulated p90 due to two different tails
+FLAG_SIM_P95_LT_REAL_P95 = 128  # simulated p95 was less than real p95 if it was topcoded
 
 
 def simulate_pareto_chunk(
@@ -668,13 +669,24 @@ def main() -> None:
         for q in QS_SIM:
           anchor_used = np.maximum(anchor_used, src[q])
 
-        # convert 0 -> NA (NULL in DB)
+        # simulated p95 below top-coded observed p95
+        sim_p95_lt_real_p95 = (
+          (src[0.95] != 95)
+          & np.isfinite(est[0.95])
+          & np.isfinite(p95)
+          & (p95 == TOPCODE)
+          & (est[0.95] < TOPCODE)
+        )
+
+        flags[sim_p95_lt_real_p95] |= FLAG_SIM_P95_LT_REAL_P95
+
+        # convert 0 to N/A (NULL in DB)
         anchor_used_series = pd.Series(
           pd.array(np.where(anchor_used == 0, np.nan, anchor_used), dtype='Int64')
         )
 
         # set flags
-        # 32: all top coded (extremely rare)
+        # all bottom coded (unheard of)
         p95 = source_arrays['hhi_p95']
         p80 = source_arrays['hhi_p80']
         p60 = source_arrays['hhi_p60']
@@ -688,21 +700,21 @@ def main() -> None:
           & np.isfinite(p40)
           & np.isfinite(p20)
         )
-        all_coded = (
+        all_bottomcoded = (
           all_T_present
-          & ((p95 == TOPCODE) | (p95 == BOTTOMCODE))
-          & ((p80 == TOPCODE) | (p80 == BOTTOMCODE))
-          & ((p60 == TOPCODE) | (p60 == BOTTOMCODE))
-          & ((p40 == TOPCODE) | (p40 == BOTTOMCODE))
-          & ((p20 == TOPCODE) | (p20 == BOTTOMCODE))
+          & (p95 == BOTTOMCODE)
+          & (p80 == BOTTOMCODE)
+          & (p60 == BOTTOMCODE)
+          & (p40 == BOTTOMCODE)
+          & (p20 == BOTTOMCODE)
         )
-        flags[all_coded] |= FLAG_ALL_TOPCODED
+        flags[all_bottomcoded] |= FLAG_ALL_BOTTOMCODED
 
-        # 1: used means anchor instead of quantile anchor
+        # used means anchor instead of quantile anchor
         used_means_for_p95 = src[0.95] == 1
         flags[used_means_for_p95] |= FLAG_LOWER_ANCHOR_WARN
 
-        # 2: accuracy below threshold (chooses the lowest accuracy among simulated anchor points)
+        # accuracy below threshold (chooses the lowest accuracy among simulated anchor points)
         # compute per-row "worst" accuracy
         acc_mat = np.vstack([acc_q[q] for q in QS_SIM])  # shape (QS_SIM, n)
         acc_for_min = np.where(np.isfinite(acc_mat), acc_mat, np.inf)
@@ -713,18 +725,18 @@ def main() -> None:
         sim_accuracy = np.full(n, np.nan, dtype='float64')
         sim_accuracy[has_acc] = worst_acc[has_acc]
 
-        low_acc = has_acc & (sim_accuracy < LOW_ACC_THRESH)
-        flags[low_acc] |= FLAG_LOW_ACC_WARN
+        low_acc = has_acc & (sim_accuracy < LOW_VALID_THRESH)
+        flags[low_acc] |= FLAG_LOW_VALID_WARN
 
-        # 16: any missing data that prevented simulation (missing means or thresholds)
+        # any missing data that prevented simulation (missing means or thresholds)
         # Define "computed_any" as: we successfully filled at least one simulated percentile.
         computed_any = np.zeros(n, dtype=bool)
         for q in QS_SIM:
           computed_any |= src[q] != 0
 
-        # Missing data means: nothing computed AND not all-coded.
-        # (BG and too-small rows never enter this loop; they already have flags 4/8.)
-        missing_data = (~computed_any) & (~all_coded)
+        # Missing data means: nothing computed AND not fully bottomcoded.
+        # Fully topcoded rows naturally fall into missing_data if means fallback cannot compute.
+        missing_data = (~computed_any) & (~all_bottomcoded)
         flags[missing_data] |= FLAG_MISSING_DATA
 
         # very "fun" SQL

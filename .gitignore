@@ -1,6 +1,9 @@
 # config/data
 **/.env
 pipeline/vre/*/
+pipeline/geo/**
+!pipeline/geo/**/*sample*
+!pipeline/geo/**/*.sh
 
 # cache
 .DS_Store

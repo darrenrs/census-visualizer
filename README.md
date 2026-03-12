@@ -18,6 +18,9 @@ An ETL pipeline + full-stack website that presents Census data and custom metric
 1. Ensure Postgres is installed and the [Census Reporter ACS data dump](https://censusreporter.tumblr.com/post/73727555158/easier-access-to-acs-data/amp) has been loaded into a new schema.
 2. Run `pipeline/vre/download_vre_tables.py`
 3. Run each of the scripts in `pipeline/sql` and `pipeline/python` in order based on their number.
+4. Run `pipeline/geo/build_geo.sh` (a sample for sumlevel `050` is provided as a ground truth example)
+
+- Prereqs: curl, unzip, ogrinfo, ogr2ogr
 
 ### Running the Website
 
@@ -41,15 +44,20 @@ Port/base path override knobs in root `.env`:
 - `PORT_CLIENT` for Vite dev server
 - `VITE_BASE_PATH` for frontend mount path
 - `VITE_API_BASE` for browser API base path
+- `VITE_GEO_BASE` for browser GeoJSON base path (local `/geo` or remote URL)
+- `GEO_ASSET_MODE` with `local|remote` (Express serves local geo only when `local`)
+- `GEO_ASSET_DIR` local directory mounted to `VITE_GEO_BASE` (default `pipeline/geo/out`)
+
+In local mode, Express serves GeoJSON from `pipeline/geo/out` at `/geo` by default.
 
 #### API
 
 The Express API currently exposes:
 
-- `GET /v1/geographies`
+- `GET /api/v1/geographies`
   - Gets list and count of all geography summary levels
-- `GET /v1/geography/:geoid`
-  - Query params:
+- `GET /api/v1/geography/:geoid`
+  - Path params:
     - `geoid` (required)
   - Response keys:
     - `geography`, `core`, `income`, `education`, `diversity`, `occupation`
@@ -65,7 +73,7 @@ Metrics are listed with their ACS table if applicable. Flags are used to describ
 - Vintage (e.g., `acs2024_5yr`)
 - Summary Level (integer)
 - Name
-- State Code (`stusab`)
+- State Code (e.g., `CA`)
 
 #### Summary Levels
 
@@ -93,7 +101,7 @@ _Household income percentile extremes and confidence intervals estimated by Pare
 - Median Household Income (B19013)
 - Household Income Thresholds at percentiles 20, 40, 60, 80, and 95 (B19080)
   - _Census topcodes values above $250,000 as "250001"_
-- Mean Household Income of quintiles 1, 2, 3, 4, 5 and top 5% (B19081)
+- Mean Household Income of quintiles 2, 3, 4, 5 and top 5% (B19081)
   - _These values are not topcoded_
 - Gini Index of Income Inequality (B19083)
 
@@ -115,11 +123,23 @@ _Five root occupational groups, twenty-five leaf occupational groups, ratio of b
 
 - Detailed Occupation Breakdown (C24010)
 
-## Todo (2026-03-08)
+## Todo (2026-03-11)
 
-- Add flags/confidence warnings in frontend
-- Add custom GIS tiles and geographies
-- Make vintage name completely non-hardcoded
+- High: Add custom vector tiles (via CDN) to support devices that have a normal amount of RAM
+- High: Add basic FAQ page
+- High: Add hover tooltip on map
+- High: Resize GeographyPanel on different display sizes
+- Medium: Save GEOID in URL state
+- Medium: Display what type of geography it is in the header
+- Medium: Show the full path of a geography (BG in this County, which is in this State...)
+- Medium: Add simple geography search
+- Medium: Add Privacy Policy/LICENSE
+- Medium: Make vintage name completely non-hardcoded (input from .env)
+- Low: Add percentile ranks grouped by geography
+- Low: Add separate pages for "leaderboards"
+- Low: Add support for 1yr vintage
+- Low: Add comparisons between geographies
+- Low: Add more attributes, introduce clustering algorithms
 
 ## Acknowledgements
 

@@ -86,11 +86,65 @@ a {
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(380px, 32vw, 460px);
+  position: relative;
 }
 
 .map-container {
   min-width: 0;
   border-right: 1px solid var(--border-soft);
+}
+
+.sumlevel-selector {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  z-index: 2;
+  width: min(360px, calc(100% - 20px));
+  padding: 12px;
+  border: 1px solid var(--border-card);
+  border-radius: 8px;
+  background: var(--bg-card);
+  box-shadow: 0 4px 20px rgba(14, 39, 31, 0.12);
+}
+
+.sumlevel-selector-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sumlevel-selector button {
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  color: var(--text-main);
+  font-size: 0.83rem;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.sumlevel-selector button:hover {
+  border-color: var(--accent);
+}
+
+.sumlevel-selector button.is-active {
+  background: var(--accent-dark);
+  border-color: var(--accent-dark);
+  color: #f4faf6;
+}
+
+.sumlevel-selector-meta {
+  margin: 10px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.sumlevel-selector-error {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: #8f2d2d;
 }
 
 .detail-panel {
@@ -111,8 +165,18 @@ a {
   font-size: 0.92rem;
 }
 
+.detail-panel p.panel-error {
+  color: #8f2d2d;
+}
+
 .detail-row {
   margin-bottom: 18px;
+}
+
+.detail-panel hr {
+  border: 0;
+  border-top: 1px solid var(--border-card);
+  margin: 10px 0 14px;
 }
 
 .panel-section {
@@ -164,7 +228,7 @@ a {
 }
 
 .panel-section .main-value {
-  font-size: 1.2rem;
+  font-size: 1.4rem;
   font-weight: 650;
   line-height: 1.2;
   color: var(--accent-dark);
@@ -174,6 +238,59 @@ a {
   font-size: 0.7rem;
   color: var(--text-subtle);
   line-height: 1.35;
+}
+
+.information-card-list {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.information-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 9px 10px;
+}
+
+.information-card-icon {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  margin-top: 1px;
+}
+
+.information-card-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.information-card-text {
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.information-card--warning {
+  background: #fff8d9;
+  border-color: #e3cf76;
+  color: #65530f;
+}
+
+.information-card--warning .information-card-icon svg {
+  color: #bc8a00;
+}
+
+.information-card--error {
+  background: #ffe9e8;
+  border-color: #e0a8a5;
+  color: #7a2020;
+}
+
+.information-card--error .information-card-icon svg {
+  color: #b43535;
 }
 
 .income-percentile-table {
@@ -264,6 +381,10 @@ a {
 
   .value-section {
     grid-template-columns: 1fr;
+  }
+
+  .sumlevel-selector {
+    top: 66px;
   }
 }
 

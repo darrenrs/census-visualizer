@@ -38,7 +38,7 @@
     "16000US4935190": {
       "sumlevel": 160,
       "hhi_sim_anchor": 1,
-      "flags": 1,
+      "flags": 2,
       "hhi_sim_p90": 440334,
       "hhi_sim_p90_lo90": 275231,
       "hhi_sim_p90_hi90": 595434,
@@ -55,7 +55,7 @@
     "16000US4969280": {
       "sumlevel": 160,
       "hhi_sim_anchor": 1,
-      "flags": 1,
+      "flags": 2,
       "hhi_sim_p90": 786336,
       "hhi_sim_p90_lo90": 490093,
       "hhi_sim_p90_hi90": 1048622,
@@ -72,7 +72,7 @@
     "16000US0603092": {
       "sumlevel": 160,
       "hhi_sim_anchor": 1,
-      "flags": 1,
+      "flags": 2,
       "hhi_sim_p90": 1339296,
       "hhi_sim_p90_lo90": 1055365,
       "hhi_sim_p90_hi90": 1612628,

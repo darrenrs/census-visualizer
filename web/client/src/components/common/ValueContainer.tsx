@@ -39,7 +39,9 @@ export function ValueContainer({
       <div className="main-value">
         {numberType === "currency" && mainValue === 250001
           ? ">$250,000"
-          : formatValue(mainValue, numberFormatMode)}
+          : numberType === "currency" && mainValue === 2499
+            ? "<$2,500"
+            : formatValue(mainValue, numberFormatMode)}
       </div>
       <div className="margin-of-error">
         {ciIsKnown

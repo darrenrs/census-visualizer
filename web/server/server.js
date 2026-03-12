@@ -28,6 +28,22 @@ const pool = new Pool({
 const PORT = Number(process.env.PORT_SERVER || 3000);
 const DEFAULT_VINTAGE =
   process.env.DEFAULT_VINTAGE || process.env.VINTAGE || "acs2024_5yr";
+const GEO_ASSET_MODE = process.env.GEO_ASSET_MODE || "local";
+const GEO_ASSET_MOUNT = process.env.VITE_GEO_BASE || "/geo";
+const GEO_ASSET_DIR = process.env.GEO_ASSET_DIR || "pipeline/geo/out";
+
+if (GEO_ASSET_MODE === "local") {
+  if (!GEO_ASSET_MOUNT.startsWith("/")) {
+    throw new Error(
+      `VITE_GEO_BASE must start with '/' when GEO_ASSET_MODE=local. Received: ${GEO_ASSET_MOUNT}`,
+    );
+  }
+  const geoAssetDirAbs = path.resolve(__dirname, "../../", GEO_ASSET_DIR);
+  app.use(GEO_ASSET_MOUNT, express.static(geoAssetDirAbs));
+  console.log(
+    `Geo assets mounted at ${GEO_ASSET_MOUNT} from ${geoAssetDirAbs}`,
+  );
+}
 
 const QUERY_GEOGRAPHIES = `
 WITH all_sumlevels AS (
@@ -86,7 +102,6 @@ WITH target AS (
   FROM api.geoid_v1 g
   WHERE g.geoid = $1
     AND g.vintage = $2
-    AND ($3::integer IS NULL OR g.sumlevel = $3)
   LIMIT 1
 )
 SELECT jsonb_build_object(
@@ -143,7 +158,7 @@ app.get("/api/v1/health", async (_req, res, next) => {
 
 app.get("/api/v1/geographies", async (req, res, next) => {
   try {
-    const vintage = String(req.query.vintage || DEFAULT_VINTAGE);
+    const vintage = DEFAULT_VINTAGE;
     const result = await pool.query(QUERY_GEOGRAPHIES, [vintage]);
     res.json(result.rows[0].payload);
   } catch (err) {
@@ -154,19 +169,13 @@ app.get("/api/v1/geographies", async (req, res, next) => {
 app.get("/api/v1/geography/:geoid", async (req, res, next) => {
   try {
     const geoid = req.params.geoid;
-    const vintage = String(req.query.vintage || DEFAULT_VINTAGE);
-
-    const sumlevel = req.query.sumlevel;
+    const vintage = DEFAULT_VINTAGE;
 
     if (!geoid) {
       res.status(400).json({ error: "GEOID is missing or invalid" });
       return;
     }
-    const result = await pool.query(QUERY_GEOGRAPHY, [
-      geoid,
-      vintage,
-      sumlevel,
-    ]);
+    const result = await pool.query(QUERY_GEOGRAPHY, [geoid, vintage]);
 
     if (result.rows.length === 0) {
       res.status(404).json({ error: "GEOID not found" });

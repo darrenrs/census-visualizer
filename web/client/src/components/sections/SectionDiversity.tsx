@@ -1,4 +1,5 @@
 import { type GeographyResponse } from "@/types/api.ts";
+import { InformationCard } from "@/components/common/InformationCard.tsx";
 import { ValueContainer } from "@/components/common/ValueContainer.tsx";
 
 type SectionProps = {
@@ -10,9 +11,16 @@ export function SectionDiversity({ geographyResponse }: SectionProps) {
     <div className="panel-section">
       <h3>Diversity</h3>
       <p>
-        The racial/ethnic diversity based on the major groups White, Black,
-        Hispanic, Native American, Asian and Pacific Islander, and Other.
+        Racial/ethnic diversity based on six broad groups: All Hispanic
+        Americans as well as Non-Hispanic White, Black, Native American, Asian
+        and Pacific Islander, and Other Americans. Normalized on a scale of 0 to
+        100 and roughly represents how evenly divided are the proportions of
+        these six groups.
       </p>
+      <InformationCard
+        section="diversity"
+        flags={geographyResponse?.diversity?.flags}
+      />
       <div className="value-section">
         <ValueContainer
           label="Diversity Index (0-100)"

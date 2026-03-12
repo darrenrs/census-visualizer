@@ -25,14 +25,14 @@ export type GeographyMeta = {
   name: string;
   vintage: string;
   state_code: string | null;
-  sumlevel: number;
+  sumlevel: Sumlevel;
 };
 
 export type CoreResponse = {
-  total_population: number | null;
+  total_population: number;
   total_population_lo90: number | null;
   total_population_hi90: number | null;
-  total_households: number | null;
+  total_households: number;
   total_households_lo90: number | null;
   total_households_hi90: number | null;
   avg_household_size: number | null;

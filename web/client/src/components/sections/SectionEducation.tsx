@@ -1,4 +1,5 @@
 import { type GeographyResponse } from "@/types/api.ts";
+import { InformationCard } from "@/components/common/InformationCard.tsx";
 import { ValueContainer } from "@/components/common/ValueContainer.tsx";
 
 type SectionProps = {
@@ -11,8 +12,14 @@ export function SectionEducation({ geographyResponse }: SectionProps) {
       <h3>Education</h3>
       <p>
         Educational attainment and average years of schooling for the population
-        25 years and over.
+        25 years and over. Education Index is normalized on a scale of 0 to 100
+        and roughly represents the educational attainment of a place with
+        respect to the national average.
       </p>
+      <InformationCard
+        section="education"
+        flags={geographyResponse?.education?.flags}
+      />
       <div className="value-section">
         <ValueContainer
           label="Education Index (0-100)"

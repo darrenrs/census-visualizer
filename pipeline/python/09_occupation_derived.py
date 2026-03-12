@@ -258,7 +258,7 @@ VRE_SUMLVLS = [
 ]
 
 FLAG_POP_TOO_SMALL = (
-  8  # population < 250, employed population over 16 < 200, households < 100, household size >= 6
+  1  # population < 250, employed population over 16 < 200, households < 100, household size >= 6
 )
 
 

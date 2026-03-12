@@ -11,6 +11,8 @@ type GeographyPanelProps = {
   onSubmit: SubmitEventHandler<HTMLFormElement>;
   onGeoidChange: (next: string) => void;
   geographyResponse: GeographyResponse | null;
+  geographyError: string | null;
+  isGeographyLoading: boolean;
 };
 
 export function GeographyPanel({
@@ -18,22 +20,57 @@ export function GeographyPanel({
   onSubmit,
   onGeoidChange,
   geographyResponse,
+  geographyError,
+  isGeographyLoading,
 }: GeographyPanelProps) {
+  const showErrorState = Boolean(geographyError) && !isGeographyLoading;
+  const statusText = isGeographyLoading
+    ? "Loading..."
+    : geographyError
+      ? geographyError
+      : null;
+
   return (
     <aside className="detail-panel" aria-label="Details panel">
       <div className="detail-row">
-        <h2>
-          {(geographyResponse && geographyResponse.geography.name) ||
-            "Enter a GEOID to view details"}
-        </h2>
-        <SectionCore geographyResponse={geographyResponse} />
-        <SectionIncome geographyResponse={geographyResponse} />
-        <SectionEducation geographyResponse={geographyResponse} />
-        <SectionDiversity geographyResponse={geographyResponse} />
-        <SectionOccupation geographyResponse={geographyResponse} />
+        {showErrorState ? (
+          <>
+            <h2>Could not load geography</h2>
+            <p className="panel-error">{geographyError}</p>
+          </>
+        ) : isGeographyLoading && !geographyResponse ? (
+          <>
+            <h2>Loading geography...</h2>
+            <p>{statusText}</p>
+          </>
+        ) : !geographyResponse ? (
+          <>
+            <h2>Welcome to Census Visualizer!</h2>
+            <p className={geographyError ? "panel-error" : undefined}>
+              {statusText ||
+                "Please click a place on the map or type in a GEOID manually to get started."}
+            </p>
+          </>
+        ) : (
+          <>
+            <h2>{geographyResponse.geography.name}</h2>
+            <p className={geographyError ? "panel-error" : undefined}>
+              {statusText ?? "\u00A0"}
+            </p>
+            <SectionCore geographyResponse={geographyResponse} />
+            <SectionIncome geographyResponse={geographyResponse} />
+            <SectionEducation geographyResponse={geographyResponse} />
+            <SectionDiversity geographyResponse={geographyResponse} />
+            <SectionOccupation geographyResponse={geographyResponse} />
+          </>
+        )}
       </div>
+      <hr />
       <div className="detail-row">
-        <h2>Manual GEOID Input (DEV ONLY)</h2>
+        <h2>Manual GEOID Input</h2>
+        <p>
+          Format: <code>(sumlevel)00US(geoid_after_us)</code>
+        </p>
         <form onSubmit={onSubmit}>
           <div className="input-row">
             <input

@@ -8,9 +8,18 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, envDir, "");
   const base = env.VITE_BASE_PATH || "/";
   const clientPort = Number(env.PORT_CLIENT || 5173);
+  const geoBase = env.VITE_GEO_BASE || "/geo";
   const apiTarget =
     env.VITE_DEV_API_TARGET ||
     `http://127.0.0.1:${Number(env.PORT_SERVER || 3000)}`;
+
+  const proxy: Record<string, { target: string }> = {
+    "/api": { target: apiTarget },
+  };
+
+  if (geoBase.startsWith("/")) {
+    proxy[geoBase] = { target: apiTarget };
+  }
 
   return {
     envDir,
@@ -24,11 +33,7 @@ export default defineConfig(({ mode }) => {
     server: {
       host: "127.0.0.1",
       port: clientPort,
-      proxy: {
-        "/api": {
-          target: apiTarget,
-        },
-      },
+      proxy,
     },
   };
 });

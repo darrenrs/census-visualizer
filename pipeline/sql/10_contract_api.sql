@@ -175,14 +175,7 @@ SELECT
  JOIN viz.income_derived d
    ON d.vintage = g.vintage
   AND d.sumlevel = g.sumlevel
-  AND d.geoid = g.geoid
-WHERE (d.flags & 8) = 0
-  AND (hhi_median IS NOT NULL
-   OR hhi_p20 IS NOT NULL
-   OR hhi_p40 IS NOT NULL
-   OR hhi_p60 IS NOT NULL
-   OR hhi_p80 IS NOT NULL
-   OR hhi_p95 IS NOT NULL);
+  AND d.geoid = g.geoid;
 
 CREATE OR REPLACE VIEW api.education_v1 AS
 SELECT
@@ -240,8 +233,7 @@ SELECT
  JOIN viz.education_derived d
    ON d.vintage = g.vintage
   AND d.sumlevel = g.sumlevel
-  AND d.geoid = g.geoid
-WHERE (d.flags & 8) = 0;
+  AND d.geoid = g.geoid;
 
 CREATE OR REPLACE VIEW api.diversity_v1 AS
 SELECT
@@ -280,8 +272,7 @@ SELECT
  JOIN viz.diversity_derived d
    ON d.vintage = g.vintage
   AND d.sumlevel = g.sumlevel
-  AND d.geoid = g.geoid
-WHERE (d.flags & 8) = 0;
+  AND d.geoid = g.geoid;
 
 CREATE OR REPLACE VIEW api.occupation_v1 AS
 SELECT
@@ -354,5 +345,4 @@ SELECT
  JOIN viz.occupation_derived d
    ON d.vintage = g.vintage
   AND d.sumlevel = g.sumlevel
-  AND d.geoid = g.geoid
-WHERE (d.flags & 8) = 0;
+  AND d.geoid = g.geoid;

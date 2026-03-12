@@ -2,9 +2,34 @@ export type NumberFormatMode =
   | "rawInteger"
   | "prefixInteger"
   | "twoDecimalPlaces"
-  | "threeDecimalPlaces";
+  | "threeDecimalPlaces"
+  | "ordinal";
 
 export type NumberType = "number" | "currency";
+export type OrdinalSuffix = "st" | "nd" | "rd" | "th";
+
+export function getOrdinalParts(n: number | null | undefined) {
+  if (n === null || n === undefined || Number.isNaN(n)) {
+    return null;
+  }
+
+  const rounded = Math.round(n);
+  const absRounded = Math.abs(rounded);
+  const lastTwo = absRounded % 100;
+  const lastOne = absRounded % 10;
+
+  let suffix: OrdinalSuffix = "th";
+  if (lastTwo < 11 || lastTwo > 13) {
+    if (lastOne === 1) suffix = "st";
+    else if (lastOne === 2) suffix = "nd";
+    else if (lastOne === 3) suffix = "rd";
+  }
+
+  return {
+    value: rounded.toLocaleString(),
+    suffix,
+  };
+}
 
 export function formatNumber(
   n: number | null | undefined,
@@ -55,6 +80,14 @@ export function formatNumber(
         minimumFractionDigits: 3,
         maximumFractionDigits: 3,
       });
+    }
+
+    case "ordinal": {
+      const parts = getOrdinalParts(n);
+      if (!parts) {
+        return "N/A";
+      }
+      return `${parts.value}${parts.suffix}`;
     }
   }
 }

@@ -130,7 +130,7 @@ VRE_SUMLVLS = [
   '860',  # Zip Code
 ]
 
-FLAG_POP_TOO_SMALL = 8  # population < 250, households < 100, household size >= 6
+FLAG_POP_TOO_SMALL = 1  # population < 250, households < 100, household size >= 6
 
 
 # GEOIDs have to be adjusted for some reason
