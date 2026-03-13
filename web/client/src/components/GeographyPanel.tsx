@@ -1,5 +1,8 @@
-import { type SubmitEventHandler } from "react";
-import { type GeographyResponse } from "@/types/api.ts";
+import { type RefObject, type SubmitEventHandler, type PointerEventHandler } from "react";
+import {
+  type GeographyListResponse,
+  type GeographyResponse,
+} from "@/types/api.ts";
 import { SectionCore } from "@/components/sections/SectionCore.tsx";
 import { SectionDiversity } from "@/components/sections/SectionDiversity.tsx";
 import { SectionEducation } from "@/components/sections/SectionEducation.tsx";
@@ -10,18 +13,26 @@ type GeographyPanelProps = {
   geoid: string;
   onSubmit: SubmitEventHandler<HTMLFormElement>;
   onGeoidChange: (next: string) => void;
+  geographyListResponse: GeographyListResponse | null;
   geographyResponse: GeographyResponse | null;
   geographyError: string | null;
   isGeographyLoading: boolean;
+  panelRef: RefObject<HTMLElement | null>;
+  onStartHorizontalResize: PointerEventHandler<HTMLDivElement>;
+  onStartVerticalResize: PointerEventHandler<HTMLDivElement>;
 };
 
 export function GeographyPanel({
   geoid,
   onSubmit,
   onGeoidChange,
+  geographyListResponse,
   geographyResponse,
   geographyError,
   isGeographyLoading,
+  panelRef,
+  onStartHorizontalResize,
+  onStartVerticalResize,
 }: GeographyPanelProps) {
   const showErrorState = Boolean(geographyError) && !isGeographyLoading;
   const statusText = isGeographyLoading
@@ -29,9 +40,21 @@ export function GeographyPanel({
     : geographyError
       ? geographyError
       : null;
+  const selectedGeographyType =
+    geographyListResponse?.geographies.find(
+      (item) => item.sumlevel === geographyResponse?.geography.sumlevel,
+    ) ?? null;
 
   return (
-    <aside className="detail-panel" aria-label="Details panel">
+    <aside ref={panelRef} className="detail-panel" aria-label="Details panel">
+      <div
+        className="panel-resize-handle panel-resize-handle--horizontal"
+        onPointerDown={onStartHorizontalResize}
+      />
+      <div
+        className="panel-resize-handle panel-resize-handle--vertical"
+        onPointerDown={onStartVerticalResize}
+      />
       <div className="detail-row">
         {showErrorState ? (
           <>
@@ -54,6 +77,9 @@ export function GeographyPanel({
         ) : (
           <>
             <h2>{geographyResponse.geography.name}</h2>
+            <p>
+              {selectedGeographyType ? selectedGeographyType.label : "\u00A0"}
+            </p>
             <p className={geographyError ? "panel-error" : undefined}>
               {statusText ?? "\u00A0"}
             </p>

@@ -123,23 +123,29 @@ _Five root occupational groups, twenty-five leaf occupational groups, ratio of b
 
 - Detailed Occupation Breakdown (C24010)
 
-## Todo (2026-03-11)
+## Todo (2026-03-12)
+
+### Features
+
+_(High: Required for v1)_
 
 - High: Add custom vector tiles (via CDN) to support devices that have a normal amount of RAM
-- High: Add basic FAQ page
-- High: Add hover tooltip on map
-- High: Resize GeographyPanel on different display sizes
-- Medium: Save GEOID in URL state
-- Medium: Display what type of geography it is in the header
 - Medium: Show the full path of a geography (BG in this County, which is in this State...)
 - Medium: Add simple geography search
-- Medium: Add Privacy Policy/LICENSE
+- Medium: Fill in about page (FAQ/Privacy Policy)
+- Medium: Add LICENSE
 - Medium: Make vintage name completely non-hardcoded (input from .env)
+- Low: Display a "long name" shorter than the full description in geography header
 - Low: Add percentile ranks grouped by geography
 - Low: Add separate pages for "leaderboards"
 - Low: Add support for 1yr vintage
 - Low: Add comparisons between geographies
 - Low: Add more attributes, introduce clustering algorithms
+
+### Bugs
+
+- Medium Priority: Disconnected from WiFi on iPhone browser (leaving LAN), then attempted to load a geography. Got stuck on "Loading" forever. Upon reconnect page immediately refreshed and was fine. Not sure what this means for "normal connection lost". (Addendum: also tested "API server is just down" and it worked normally. The weird behavior was only when disconnected from LAN.)
+- Low Priority: If an offline error occurred, trying to load the same GEOID will not trigger anything even if network reconnects. User can load another geography then go back to the original one and both will work, it's just the initial state seems to be stuck if you try to reload same one.
 
 ## Acknowledgements
 

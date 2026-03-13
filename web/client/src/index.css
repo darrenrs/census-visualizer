@@ -85,13 +85,20 @@ a {
 .content-shell {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(380px, 32vw, 460px);
+  grid-template-columns:
+    minmax(0, 1fr)
+    var(--panel-width, clamp(380px, 32vw, 460px));
   position: relative;
+}
+
+.text-page {
+  margin: 18px;
 }
 
 .map-container {
   min-width: 0;
   border-right: 1px solid var(--border-soft);
+  position: relative;
 }
 
 .sumlevel-selector {
@@ -151,6 +158,53 @@ a {
   background: var(--bg-panel);
   padding: 16px;
   overflow-y: auto;
+  position: relative;
+  min-height: 0;
+}
+
+.panel-resize-handle {
+  position: absolute;
+  z-index: 4;
+  touch-action: none;
+}
+
+.panel-resize-handle--horizontal {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 10px;
+  cursor: col-resize;
+  transform: translateX(-50%);
+}
+
+.panel-resize-handle--vertical {
+  position: sticky;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 40px;
+  margin-bottom: -12px;
+  cursor: row-resize;
+  transform: translateY(-50%);
+  display: none;
+  z-index: 6;
+}
+
+.panel-resize-handle--vertical::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 5px;
+  width: 68px;
+  height: 5px;
+  border-radius: 999px;
+  transform: translateX(-50%);
+  background: color-mix(
+    in srgb,
+    var(--border-soft) 86%,
+    var(--accent-dark) 14%
+  );
+  box-shadow: 0 1px 0 rgba(18, 32, 35, 0.16);
 }
 
 .detail-panel h2 {
@@ -200,7 +254,7 @@ a {
 
 .value-section {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
   margin-top: 10px;
 }
@@ -371,7 +425,8 @@ a {
 @media (max-width: 960px) {
   .content-shell {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(220px, 50vh) 1fr;
+    grid-template-rows: var(--map-height, minmax(220px, 50vh)) minmax(0, 1fr);
+    min-height: 0;
   }
 
   .map-container {
@@ -379,12 +434,12 @@ a {
     border-bottom: 1px solid var(--border-soft);
   }
 
-  .value-section {
-    grid-template-columns: 1fr;
+  .panel-resize-handle--horizontal {
+    display: none;
   }
 
-  .sumlevel-selector {
-    top: 66px;
+  .panel-resize-handle--vertical {
+    display: block;
   }
 }
 
@@ -395,4 +450,19 @@ a {
 .map-canvas {
   width: 100%;
   height: 100%;
+}
+
+.map-tooltip {
+  position: absolute;
+  pointer-events: none;
+  z-index: 3;
+  max-width: min(320px, 65vw);
+  padding: 6px 8px;
+  border: 1px solid var(--border-card);
+  border-radius: 6px;
+  background: rgba(18, 32, 35, 0.92);
+  color: #f6fbf7;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
 }

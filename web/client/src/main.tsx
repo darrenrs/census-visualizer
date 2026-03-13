@@ -5,9 +5,12 @@ import "@fontsource-variable/outfit/wght.css";
 import "@fontsource-variable/spline-sans-mono/wght.css";
 import "./index.css";
 import App from "./App.tsx";
+import { BrowserRouter } from "react-router-dom";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <App />
+    </BrowserRouter>
   </StrictMode>,
 );

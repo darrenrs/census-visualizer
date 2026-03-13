@@ -15,7 +15,7 @@ export type GeographyListItem = {
   geography_count: number;
 };
 
-export type GeographiesResponse = {
+export type GeographyListResponse = {
   vintage: string;
   geographies: GeographyListItem[];
 };

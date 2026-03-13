@@ -1,9 +1,9 @@
-import { type Sumlevel, type GeographiesResponse } from "@/types/api.ts";
+import { type Sumlevel, type GeographyListResponse } from "@/types/api.ts";
 
 type SumlevelSelectorProps = {
   activeSumlevel: Sumlevel;
   onSelectSumlevel: (next: Sumlevel) => void;
-  geographyListResponse: GeographiesResponse | null;
+  geographyListResponse: GeographyListResponse | null;
   geographyListError: string | null;
 };
 
