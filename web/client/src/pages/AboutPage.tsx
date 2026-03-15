@@ -20,9 +20,19 @@ export default function AboutPage() {
       <main className="content-shell">
         <div className="text-page">
           <h1>Census Visualizer</h1>
-          <p>Future About/FAQ/Privacy page.</p>
+          <p>
+            Welcome to Census Visualizer! This is a fully open-source website
+            that presents vital demographic statistics and derived metrics about
+            United States locations (e.g., states, counties, ZIP Codes,
+            neighborhoods.)
+          </p>
+          <p>
+            Definitions/math will be added here soon. Please check the README
+            for technical info.
+          </p>
 
-          <p>&copy; 2026 Darren R. Skidmore. All rights reserved.</p>
+          {/* uncomment when added LICENSE */}
+          {/* <p>&copy; 2026 Darren R. Skidmore. All rights reserved.</p> */}
         </div>
       </main>
     </div>

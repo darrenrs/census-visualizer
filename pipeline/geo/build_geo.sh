@@ -3,11 +3,23 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 GEO_DIR="$ROOT_DIR/pipeline/geo"
-ZIP_DIR="$GEO_DIR/zips"
-RAW_DIR="$GEO_DIR/raw"
+WORK_DIR="$GEO_DIR/work"
+ZIP_DIR="$WORK_DIR/zips"
+RAW_DIR="$WORK_DIR/raw"
+MBTILES_DIR="$WORK_DIR/mbtiles"
+GEOID_WORK_DIR="$WORK_DIR/geoid"
 OUT_DIR="$GEO_DIR/out"
+OUT_GEOJSON_DIR="$OUT_DIR/geojson"
+OUT_PMTILES_DIR="$OUT_DIR/pmtiles"
+ROOT_ENV_FILE="$ROOT_DIR/.env"
 
-mkdir -p "$ZIP_DIR" "$RAW_DIR" "$OUT_DIR"
+mkdir -p \
+  "$ZIP_DIR" \
+  "$RAW_DIR" \
+  "$MBTILES_DIR" \
+  "$GEOID_WORK_DIR" \
+  "$OUT_GEOJSON_DIR" \
+  "$OUT_PMTILES_DIR"
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -20,6 +32,21 @@ require_cmd curl
 require_cmd unzip
 require_cmd ogrinfo
 require_cmd ogr2ogr
+require_cmd psql
+
+if [[ -z "${DATABASE_URL:-}" && -f "$ROOT_ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ROOT_ENV_FILE"
+  set +a
+fi
+
+if [[ -z "${DATABASE_URL:-}" ]]; then
+  echo "DATABASE_URL is required. Set it in environment or $ROOT_ENV_FILE." >&2
+  exit 1
+fi
+
+VINTAGE="${VINTAGE:-acs2024_5yr}"
 
 # sumlevel|url
 # Updated through 2024 (ZCTA are still stuck in 2020)
@@ -47,7 +74,9 @@ for row in "${MAPS[@]}"; do
 
   zip_path="$ZIP_DIR/${sumlevel}.zip"
   raw_path="$RAW_DIR/${sumlevel}"
-  out_path="$OUT_DIR/${sumlevel}.geojson"
+  tmp_gpkg="$GEOID_WORK_DIR/${sumlevel}.gpkg"
+  lookup_csv="$GEOID_WORK_DIR/${sumlevel}_lookup.csv"
+  out_path="$OUT_GEOJSON_DIR/${sumlevel}.geojson"
 
   echo "==> [$sumlevel] Downloading"
   curl -fL "$url" -o "$zip_path"
@@ -66,70 +95,92 @@ for row in "${MAPS[@]}"; do
   layer="$(basename "$shp_path" .shp)"
   meta="$(ogrinfo -so "$shp_path" "$layer")"
 
-  statefp_expr="NULL"
-  geoidfq_expr="NULL"
-  namelsad_expr="NULL"
-  stusps_expr="NULL"
+  geoid_raw_expr="NULL"
 
   if [[ "$sumlevel" == "860" ]]; then
-    # ZCTA can cross state lines, so keep state-specific fields NULL.
-    statefp_expr="NULL"
-    stusps_expr="NULL"
-
     if has_field "$meta" "AFFGEOID20"; then
-      geoidfq_expr="AFFGEOID20"
-    fi
-
-    # Keep display name as the raw 5-digit ZIP code string.
-    if has_field "$meta" "ZCTA5CE20"; then
-      namelsad_expr="ZCTA5CE20"
-    elif has_field "$meta" "NAME20"; then
-      namelsad_expr="NAME20"
+      geoid_raw_expr="AFFGEOID20"
+    elif has_field "$meta" "GEOID20"; then
+      geoid_raw_expr="'${sumlevel}00US' || GEOID20"
     fi
   else
-    if has_field "$meta" "STATEFP"; then
-      statefp_expr="STATEFP"
-    fi
-
     if has_field "$meta" "GEOIDFQ"; then
-      geoidfq_expr="GEOIDFQ"
+      geoid_raw_expr="GEOIDFQ"
+    elif has_field "$meta" "AFFGEOID"; then
+      geoid_raw_expr="AFFGEOID"
     elif has_field "$meta" "GEOID"; then
-      geoidfq_expr="'${sumlevel}00US' || GEOID"
-    fi
-
-    if has_field "$meta" "NAMELSAD"; then
-      namelsad_expr="NAMELSAD"
-    elif has_field "$meta" "NAME"; then
-      namelsad_expr="NAME"
-    fi
-
-    if has_field "$meta" "STUSPS"; then
-      stusps_expr="STUSPS"
+      geoid_raw_expr="'${sumlevel}00US' || GEOID"
     fi
   fi
 
-  sql="
+  if [[ "$geoid_raw_expr" == "NULL" ]]; then
+    echo "Could not determine source GEOID field for sumlevel $sumlevel" >&2
+    exit 1
+  fi
+
+  normalize_sql="
     SELECT
-      ${statefp_expr} AS STATEFP,
-      ${geoidfq_expr} AS GEOIDFQ,
-      ${namelsad_expr} AS NAMELSAD,
-      ${stusps_expr} AS STUSPS,
-      '${sumlevel}' AS SUMLEVEL,
+      CASE
+        WHEN ${geoid_raw_expr} IS NULL THEN NULL
+        ELSE substr(${geoid_raw_expr}, 1, 3) || substr(${geoid_raw_expr}, 6)
+      END AS geoid_norm,
       geometry
     FROM \"${layer}\"
   "
 
-  echo "==> [$sumlevel] Converting to GeoJSON"
+  echo "==> [$sumlevel] Building normalized geometry layer"
+  rm -f "$tmp_gpkg" "$lookup_csv"
   ogr2ogr \
-    -f GeoJSON \
+    -f GPKG \
     -t_srs EPSG:4326 \
     -dialect SQLite \
-    -sql "$sql" \
+    -sql "$normalize_sql" \
+    -nln tiger_norm \
+    -overwrite \
+    "$tmp_gpkg" \
+    "$shp_path"
+
+  echo "==> [$sumlevel] Exporting SQL lookup from api.geoid_v1"
+  vintage_sql="${VINTAGE//\'/\'\'}"
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "
+    COPY (
+      SELECT geoid, name, state_code
+      FROM api.geoid_v1
+      WHERE vintage = '${vintage_sql}'
+        AND sumlevel = ${sumlevel}
+    ) TO STDOUT WITH (FORMAT csv, HEADER true)
+  " > "$lookup_csv"
+
+  echo "==> [$sumlevel] Loading lookup CSV"
+  ogr2ogr \
+    -f GPKG \
+    "$tmp_gpkg" \
+    "$lookup_csv" \
+    -nln geoid_lookup \
+    -oo AUTODETECT_TYPE=YES \
+    -overwrite
+
+  join_sql="
+    SELECT
+      t.geoid_norm AS GEOID,
+      l.name AS NAME,
+      l.state_code AS STATE_CODE,
+      t.geometry
+    FROM tiger_norm t
+    INNER JOIN geoid_lookup l
+      ON l.geoid = t.geoid_norm
+  "
+
+  echo "==> [$sumlevel] Writing final GeoJSON"
+  ogr2ogr \
+    -f GeoJSON \
+    -dialect SQLite \
+    -sql "$join_sql" \
     -lco RFC7946=YES \
     "$out_path" \
-    "$shp_path"
+    "$tmp_gpkg"
 
   echo "==> [$sumlevel] Wrote $out_path"
 done
 
-echo "Done. GeoJSON outputs are in: $OUT_DIR"
+echo "Done. GeoJSON outputs are in: $OUT_GEOJSON_DIR"

@@ -262,19 +262,9 @@ FLAG_POP_TOO_SMALL = (
 )
 
 
-# GEOIDs have to be adjusted for some reason
+# Adjust GEOIDs to drop the GEOVAR fully qualified portion
 def normalize_geoid(raw: str) -> str:
-  first_three_chars = raw[:3]
-
-  match first_three_chars:
-    case '310':
-      return raw.replace('310M700US', '31000US')
-    case '500':
-      return raw.replace('5001900US', '50000US')
-    case '860':
-      return raw.replace('860Z200US', '86000US')
-    case _:
-      return raw.replace('00000US', '000US', 1)
+  return raw[:3] + raw[5:]
 
 
 def _compute_hill_for_slots(rows, slots):

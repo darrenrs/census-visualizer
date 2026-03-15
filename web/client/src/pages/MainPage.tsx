@@ -266,7 +266,11 @@ export default function MainPage() {
         className="content-shell"
         style={contentShellStyle}
       >
-        <MapViewer onSelectGeoid={updateHash} sumlevel={activeSumlevel} />
+        <MapViewer
+          onSelectGeoid={updateHash}
+          sumlevel={activeSumlevel}
+          selectedGeoid={geoidFromHash}
+        />
         <SumlevelSelector
           activeSumlevel={activeSumlevel}
           onSelectSumlevel={setActiveSumlevel}

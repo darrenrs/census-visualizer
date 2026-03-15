@@ -3,23 +3,24 @@ CREATE SCHEMA IF NOT EXISTS api;
 CREATE TABLE IF NOT EXISTS api.geographies_v1 (
   sumlevel    integer NOT NULL,
   label       text NOT NULL,
-  description text,
+  long_label  text NOT NULL,
+  description text NOT NULL,
 
   PRIMARY KEY (sumlevel)
 );
 
-INSERT INTO api.geographies_v1 (sumlevel, label, description)
+INSERT INTO api.geographies_v1 (sumlevel, label, long_label, description)
 VALUES
-  (10,  'Nation', 'United States of America (excluding Puerto Rico and other island territories)'),
-  (40,  'State', 'State or state-equivalent (50 states, District of Columbia, and Puerto Rico)'),
-  (50,  'County', 'County or county-equivalent (e.g., Louisiana parishes, Alaska boroughs/census areas, Puerto Rico municipios)'),
-  (60,  'County Subdivision', 'County subdivision (e.g., township/precinct/MCD; varies by state)'),
-  (140, 'Tract', 'Census tract (typically 1,200 to 8,000 people)'),
-  (150, 'Block Group', 'Census block group (typically 600-3,000 people)'),
-  (160, 'Place', 'Incorporated place or Census Designated Place (CDP)'),
-  (310, 'CBSA', 'Metropolitan or Micropolitan Statistical Area (CBSA)'),
-  (500, 'Congressional District', 'State-congressional district (119th Congress for ACS 2024)'),
-  (860, 'ZCTA', 'ZIP Code Tabulation Area (near-equivalent of USPS ZIP Code service areas)');
+  (10,  'Nation', 'United States', 'United States of America (excluding Puerto Rico and other island territories)'),
+  (40,  'State', 'State/State-Equivalent', 'State or state-equivalent (50 states, District of Columbia, and Puerto Rico)'),
+  (50,  'County', 'County/County-Equivalent', 'County or county-equivalent (e.g., Louisiana parishes, Alaska boroughs/census areas, Puerto Rico municipios)'),
+  (60,  'County Subdivision', 'County Subdivsion (minor/census civil division)', 'County subdivision (e.g., cities/townships/districts/census civil division; varies by state)'),
+  (140, 'Tract', 'Census Tract', 'Census Tract (typically 1,200 to 8,000 people)'),
+  (150, 'Block Group', 'Census Block Group', 'Census block group (typically 600-3,000 people)'),
+  (160, 'Place', 'Incorporated Place/CDP', 'Incorporated place or Census Designated Place (CDP)'),
+  (310, 'CBSA', 'Metropolitan/Micropolitan Area', 'Metropolitan or Micropolitan Statistical Area (CBSA)'),
+  (500, 'Congressional District', 'Congressional District (119th Congress)', 'State-congressional district (119th Congress for ACS 2024)'),
+  (860, 'ZCTA', 'ZIP Code Tabulation Area', 'ZIP Code Tabulation Area (near-equivalent of USPS ZIP Code service areas)');
 
 CREATE OR REPLACE VIEW api.geoid_v1 AS
 SELECT

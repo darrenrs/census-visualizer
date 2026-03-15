@@ -7,9 +7,23 @@ An ETL pipeline + full-stack website that presents Census data and custom metric
 - Robust data pipeline from raw Census Reporter American Community Survey (ACS) data into Postgres offering support for more than 400,000 geographies
 - Derived metrics such as upper income percentiles using Pareto curves and normalized education, racial/ethnic diversity, and occupation indices
 - 90% margin of errors for all computable fields from Census variance replicate tables or Monte Carlo simulation
-- Node/Express backend, React/Vite frontend
+- Node/Express API server that gets all information for any geography in one request
+- Responsive React/Vite single-page application with MapLibre map utilizing vector tiles (PMTiles) for quick and seamless rendering
+- Support for local or remote PMTiles storage
 
 ## Build Instructions
+
+### .env
+
+A sample `.env` file is provided at `.env.example`.
+
+- `PORT_SERVER` for API server
+- `PORT_CLIENT` for Vite dev server
+- `VITE_BASE_PATH` for frontend mount path
+- `VITE_API_BASE` for browser API base path
+- `VITE_GEO_BASE` for browser geo asset base path (local `/geo` or remote URL)
+- `GEO_ASSET_MODE` with `local|remote` (Express serves local geo only when `local`)
+- `GEO_ASSET_DIR` local directory mounted to `VITE_GEO_BASE` (default `pipeline/geo/out`)
 
 ### Running the Pipeline
 
@@ -18,37 +32,30 @@ An ETL pipeline + full-stack website that presents Census data and custom metric
 1. Ensure Postgres is installed and the [Census Reporter ACS data dump](https://censusreporter.tumblr.com/post/73727555158/easier-access-to-acs-data/amp) has been loaded into a new schema.
 2. Run `pipeline/vre/download_vre_tables.py`
 3. Run each of the scripts in `pipeline/sql` and `pipeline/python` in order based on their number.
-4. Run `pipeline/geo/build_geo.sh` (a sample for sumlevel `050` is provided as a ground truth example)
+4. Run `pipeline/geo/build_geo.sh` (ensure dependencies are installed)
+5. Run `pipeline/geo/build_tiles.sh` (ensure dependencies are installed)
 
-- Prereqs: curl, unzip, ogrinfo, ogr2ogr
+#### Shell Dependencies
+
+- `build_geo.sh`
+  - curl
+  - unzip
+  - ogrinfo
+  - ogr2ogr
+  - psql
+- `build_tiles.sh`
+  - tippecanoe
+  - pmtiles
 
 ### Running the Website
 
 1. `cp .env.example .env` and set values
 2. `cd web/server`
 3. `npm install`
-4. `npm run dev`
+4. `npm run dev` - the API will now be running at `http://localhost:{PORT_SERVER|3000}`
 5. `cd web/client`
 6. `npm install`
-7. `npm run dev`
-8. Open `http://127.0.0.1:5173`
-
-Default local URLs:
-
-- Frontend: `http://127.0.0.1:5173`
-- API: `http://127.0.0.1:3000`
-
-Port/base path override knobs in root `.env`:
-
-- `PORT_SERVER` for API server
-- `PORT_CLIENT` for Vite dev server
-- `VITE_BASE_PATH` for frontend mount path
-- `VITE_API_BASE` for browser API base path
-- `VITE_GEO_BASE` for browser GeoJSON base path (local `/geo` or remote URL)
-- `GEO_ASSET_MODE` with `local|remote` (Express serves local geo only when `local`)
-- `GEO_ASSET_DIR` local directory mounted to `VITE_GEO_BASE` (default `pipeline/geo/out`)
-
-In local mode, Express serves GeoJSON from `pipeline/geo/out` at `/geo` by default.
+7. `npm run dev` - the front-end will now be running at `http://localhost:{PORT_CLIENT|5173}`
 
 #### API
 
@@ -123,26 +130,32 @@ _Five root occupational groups, twenty-five leaf occupational groups, ratio of b
 
 - Detailed Occupation Breakdown (C24010)
 
-## Todo (2026-03-12)
+## Todo (2026-03-14)
 
-### Features
+### Improvements
 
-_(High: Required for v1)_
+- Show state code in GeographyPanel
+- Show full path (block group in X County, in X State ...) in GeographyPanel
+- Add simple geography search
+- Add address geocoder from Census Geocoder API
+- Add LICENSE
+- Add Privacy Policy
+- Much more detailed about page with math explanations
+- Make vintage name completely non-hardcoded (input from .env)
+- Make sure all environment variables have proper null handling
+- Add graphs/charts (because they are pretty)
 
-- High: Add custom vector tiles (via CDN) to support devices that have a normal amount of RAM
-- Medium: Show the full path of a geography (BG in this County, which is in this State...)
-- Medium: Add simple geography search
-- Medium: Fill in about page (FAQ/Privacy Policy)
-- Medium: Add LICENSE
-- Medium: Make vintage name completely non-hardcoded (input from .env)
-- Low: Display a "long name" shorter than the full description in geography header
-- Low: Add percentile ranks grouped by geography
-- Low: Add separate pages for "leaderboards"
-- Low: Add support for 1yr vintage
-- Low: Add comparisons between geographies
-- Low: Add more attributes, introduce clustering algorithms
+### New Features
+
+- Add percentile ranks for attributes
+- Add separate pages for leaderboards (e.g., top places by education index)
+- Compare two or more geographies
+- Add more attributes
+- Introduce clustering algorithms (branching into ML now)
 
 ### Bugs
+
+_These are also in GitHub Issues_
 
 - Medium Priority: Disconnected from WiFi on iPhone browser (leaving LAN), then attempted to load a geography. Got stuck on "Loading" forever. Upon reconnect page immediately refreshed and was fine. Not sure what this means for "normal connection lost". (Addendum: also tested "API server is just down" and it worked normally. The weird behavior was only when disconnected from LAN.)
 - Low Priority: If an offline error occurred, trying to load the same GEOID will not trigger anything even if network reconnects. User can load another geography then go back to the original one and both will work, it's just the initial state seems to be stuck if you try to reload same one.

@@ -11,7 +11,8 @@ export type Sumlevel = 10 | 40 | 50 | 60 | 140 | 150 | 160 | 310 | 500 | 860;
 export type GeographyListItem = {
   sumlevel: Sumlevel;
   label: string;
-  description: string | null;
+  long_label: string;
+  description: string;
   geography_count: number;
 };
 

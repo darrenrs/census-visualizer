@@ -1,4 +1,8 @@
-import { type RefObject, type SubmitEventHandler, type PointerEventHandler } from "react";
+import {
+  type RefObject,
+  type SubmitEventHandler,
+  type PointerEventHandler,
+} from "react";
 import {
   type GeographyListResponse,
   type GeographyResponse,
@@ -78,7 +82,9 @@ export function GeographyPanel({
           <>
             <h2>{geographyResponse.geography.name}</h2>
             <p>
-              {selectedGeographyType ? selectedGeographyType.label : "\u00A0"}
+              {selectedGeographyType
+                ? selectedGeographyType.long_label
+                : "\u00A0"}
             </p>
             <p className={geographyError ? "panel-error" : undefined}>
               {statusText ?? "\u00A0"}

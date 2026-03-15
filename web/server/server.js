@@ -26,8 +26,7 @@ const pool = new Pool({
 });
 
 const PORT = Number(process.env.PORT_SERVER || 3000);
-const DEFAULT_VINTAGE =
-  process.env.DEFAULT_VINTAGE || process.env.VINTAGE || "acs2024_5yr";
+const VINTAGE = process.env.VINTAGE || "acs2024_5yr";
 const GEO_ASSET_MODE = process.env.GEO_ASSET_MODE || "local";
 const GEO_ASSET_MOUNT = process.env.VITE_GEO_BASE || "/geo";
 const GEO_ASSET_DIR = process.env.GEO_ASSET_DIR || "pipeline/geo/out";
@@ -39,7 +38,20 @@ if (GEO_ASSET_MODE === "local") {
     );
   }
   const geoAssetDirAbs = path.resolve(__dirname, "../../", GEO_ASSET_DIR);
-  app.use(GEO_ASSET_MOUNT, express.static(geoAssetDirAbs));
+  app.use(
+    GEO_ASSET_MOUNT,
+    express.static(geoAssetDirAbs, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith(".pmtiles")) {
+          res.setHeader("Content-Type", "application/octet-stream");
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else if (filePath.endsWith(".pbf")) {
+          res.setHeader("Content-Type", "application/vnd.mapbox-vector-tile");
+          res.setHeader("Content-Encoding", "gzip");
+        }
+      },
+    }),
+  );
   console.log(
     `Geo assets mounted at ${GEO_ASSET_MOUNT} from ${geoAssetDirAbs}`,
   );
@@ -50,6 +62,7 @@ WITH all_sumlevels AS (
   SELECT
     g.sumlevel,
     g.label,
+    g.long_label,
     g.description
   FROM api.geographies_v1 g
 ),
@@ -69,6 +82,7 @@ SELECT jsonb_build_object(
       jsonb_build_object(
         'sumlevel', s.sumlevel,
         'label', s.label,
+        'long_label', s.long_label,
         'description', s.description,
         'geography_count', COALESCE(c.geography_count, 0)
       )
@@ -158,7 +172,7 @@ app.get("/api/v1/health", async (_req, res, next) => {
 
 app.get("/api/v1/geographies", async (req, res, next) => {
   try {
-    const vintage = DEFAULT_VINTAGE;
+    const vintage = VINTAGE;
     const result = await pool.query(QUERY_GEOGRAPHIES, [vintage]);
     res.json(result.rows[0].payload);
   } catch (err) {
@@ -169,7 +183,7 @@ app.get("/api/v1/geographies", async (req, res, next) => {
 app.get("/api/v1/geography/:geoid", async (req, res, next) => {
   try {
     const geoid = req.params.geoid;
-    const vintage = DEFAULT_VINTAGE;
+    const vintage = VINTAGE;
 
     if (!geoid) {
       res.status(400).json({ error: "GEOID is missing or invalid" });

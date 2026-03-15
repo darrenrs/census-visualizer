@@ -33,25 +33,28 @@ export function SumlevelSelector({
   return (
     <div className="sumlevel-selector">
       <div className="sumlevel-selector-buttons">
-        {geographyListResponse.geographies.map((sumlevel) => {
-          const isActive = sumlevel.sumlevel === activeSumlevel;
+        {geographyListResponse.geographies.map((geographyItem) => {
+          const isActive = geographyItem.sumlevel === activeSumlevel;
 
           return (
             <button
-              key={sumlevel.sumlevel}
+              key={geographyItem.sumlevel}
               type="button"
               className={isActive ? "is-active" : ""}
-              onClick={() => onSelectSumlevel(sumlevel.sumlevel)}
-              value={sumlevel.sumlevel}
+              onClick={() => onSelectSumlevel(geographyItem.sumlevel)}
+              value={geographyItem.sumlevel}
             >
-              {sumlevel.label}
+              {geographyItem.label}{" "}
+              {isActive
+                ? `(${geographyItem.geography_count.toLocaleString()})`
+                : ""}
             </button>
           );
         })}
       </div>
       <p className="sumlevel-selector-meta">
         {selectedItem
-          ? `${selectedItem.description ?? "No description"} (${selectedItem.geography_count.toLocaleString()})`
+          ? `${selectedItem.description}`
           : "Choose a geography type."}
       </p>
     </div>
