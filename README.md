@@ -28,6 +28,7 @@ A sample `.env` file is provided at `.env.example`.
 ### Running the Pipeline
 
 (This will be integrated into one Makefile soon. From a clean slate this entire process will take about 30 min to complete.)
+(Python tested with 3.12.7; if latest version of Python is failing you'll need to set up a virtual environment.)
 
 1. Ensure Postgres is installed and the [Census Reporter ACS data dump](https://censusreporter.tumblr.com/post/73727555158/easier-access-to-acs-data/amp) has been loaded into a new schema.
 2. Run `pipeline/vre/download_vre_tables.py`
@@ -55,7 +56,7 @@ A sample `.env` file is provided at `.env.example`.
 4. `npm run dev` - the API will now be running at `http://localhost:{PORT_SERVER|3000}`
 5. `cd web/client`
 6. `npm install`
-7. `npm run dev` - the front-end will now be running at `http://localhost:{PORT_CLIENT|5173}`
+7. `npm run dev` - the frontend will now be running at `http://localhost:{PORT_CLIENT|5173}`
 
 #### API
 
@@ -143,6 +144,7 @@ _Five root occupational groups, twenty-five leaf occupational groups, ratio of b
 - Much more detailed about page with math explanations
 - Make vintage name completely non-hardcoded (input from .env)
 - Make sure all environment variables have proper null handling
+- `requirements.txt` libraries have version numbers for stability
 - Add graphs/charts (because they are pretty)
 
 ### New Features
