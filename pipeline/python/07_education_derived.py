@@ -149,7 +149,6 @@ WHERE d.vintage  = t.vintage
   AND (d.flags & %s) = 0;
 """
 
-VINTAGE = 'acs2024_5yr'
 CHUNK_SIZE = 10_000
 ACS_TABLE_CODE = 'B15002'
 
@@ -281,17 +280,21 @@ def main() -> None:
   # Load .env from project root
   load_dotenv()
 
+  vintage = os.getenv('VINTAGE')
+  if not vintage:
+    raise RuntimeError('VINTAGE not set (set in .env or environment.)')
+
   db_url = os.getenv('DATABASE_URL')
   if not db_url:
-    raise RuntimeError('DATABASE_URL not set.')
+    raise RuntimeError('DATABASE_URL not set (set in .env or environment.)')
 
   # Write education index, years of schooling, and error bars to sql
   with psycopg.connect(db_url) as write_conn:
     # Setup on write conn
     with write_conn.cursor() as cur:
       cur.execute(QUERY_CREATE_TABLE)
-      cur.execute(QUERY_RESET_TABLE, (VINTAGE,))
-      cur.execute(QUERY_POPULATE_TABLE_WITH_FLAGS, (FLAG_POP_TOO_SMALL, VINTAGE))
+      cur.execute(QUERY_RESET_TABLE, (vintage,))
+      cur.execute(QUERY_POPULATE_TABLE_WITH_FLAGS, (FLAG_POP_TOO_SMALL, vintage))
 
       rows_buf = []
 
@@ -311,7 +314,7 @@ def main() -> None:
           ei_lo, ei_hi, yos_lo, yos_hi = res
           geoid = normalize_geoid(geoid_raw)
 
-          rows_buf.append((VINTAGE, sumlevel, geoid, ei_lo, ei_hi, yos_lo, yos_hi))
+          rows_buf.append((vintage, sumlevel, geoid, ei_lo, ei_hi, yos_lo, yos_hi))
 
           if len(rows_buf) >= CHUNK_SIZE:
             out_df = pd.DataFrame(

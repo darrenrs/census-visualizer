@@ -1,6 +1,7 @@
-DROP TABLE IF EXISTS viz.income_base;
+BEGIN;
 
-CREATE TABLE viz.income_base AS
+CREATE TEMP TABLE tmp_income_base
+ON COMMIT DROP AS
 SELECT
   g.vintage,
   g.sumlevel,
@@ -38,10 +39,35 @@ SELECT
   viz.clean_dec(gini.b19083001)               AS hhi_gini,
   (viz.clean_dec(gini.b19083001_moe) / 1.645) AS hhi_gini_se
 FROM viz.geoid_base g
-LEFT JOIN acs2024_5yr.b19013_moe hhi USING (geoid)
-LEFT JOIN acs2024_5yr.b19080_moe quintile_thresh USING (geoid)
-LEFT JOIN acs2024_5yr.b19081_moe quintile_avg USING (geoid)
-LEFT JOIN acs2024_5yr.b19083_moe gini USING (geoid);
+LEFT JOIN :"vintage".b19013_moe hhi USING (geoid)
+LEFT JOIN :"vintage".b19080_moe quintile_thresh USING (geoid)
+LEFT JOIN :"vintage".b19081_moe quintile_avg USING (geoid)
+LEFT JOIN :"vintage".b19083_moe gini USING (geoid)
+WHERE g.vintage = :'vintage';
 
-ALTER TABLE viz.income_base
-ADD CONSTRAINT income_base_pkey PRIMARY KEY (vintage, sumlevel, geoid);
+CREATE TABLE IF NOT EXISTS viz.income_base (
+  LIKE tmp_income_base INCLUDING DEFAULTS
+);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'income_base_pkey'
+      AND conrelid = 'viz.income_base'::regclass
+  ) THEN
+    ALTER TABLE viz.income_base
+    ADD CONSTRAINT income_base_pkey PRIMARY KEY (vintage, sumlevel, geoid);
+  END IF;
+END
+$$;
+
+DELETE FROM viz.income_base
+WHERE vintage = :'vintage';
+
+INSERT INTO viz.income_base
+SELECT *
+FROM tmp_income_base;
+
+COMMIT;

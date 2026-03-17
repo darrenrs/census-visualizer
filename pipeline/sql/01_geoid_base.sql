@@ -1,8 +1,9 @@
-DROP TABLE IF EXISTS viz.geoid_base;
+BEGIN;
 
-CREATE TABLE viz.geoid_base AS
+CREATE TEMP TABLE tmp_geoid_base
+ON COMMIT DROP AS
 SELECT
-  'acs2024_5yr'::text AS vintage,
+  :'vintage'::text AS vintage,
   g.geoid,
   g.name,
   g.sumlevel,
@@ -19,10 +20,10 @@ SELECT
   -- Table B25010: Average Household Size
   viz.clean_dec(hhs.b25010001)               AS household_size,
   (viz.clean_dec(hhs.b25010001_moe) / 1.645) AS household_size_se
-FROM acs2024_5yr.geoheader g
-JOIN acs2024_5yr.b01003_moe pop USING (geoid)
-JOIN acs2024_5yr.b11001_moe hh USING (geoid)
-JOIN acs2024_5yr.b25010_moe hhs USING (geoid)
+FROM :"vintage".geoheader g
+JOIN :"vintage".b01003_moe pop USING (geoid)
+JOIN :"vintage".b11001_moe hh USING (geoid)
+JOIN :"vintage".b25010_moe hhs USING (geoid)
 WHERE
   sumlevel IN ('010','040','050','060','140','150','160','310','500','860')
   AND component = '00'
@@ -30,5 +31,29 @@ WHERE
   AND hh.b11001001 IS NOT NULL
   AND hhs.b25010001 IS NOT NULL;
 
-ALTER TABLE viz.geoid_base
-ADD CONSTRAINT geoid_base_pkey PRIMARY KEY (vintage, sumlevel, geoid);
+CREATE TABLE IF NOT EXISTS viz.geoid_base (
+  LIKE tmp_geoid_base INCLUDING DEFAULTS
+);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'geoid_base_pkey'
+      AND conrelid = 'viz.geoid_base'::regclass
+  ) THEN
+    ALTER TABLE viz.geoid_base
+    ADD CONSTRAINT geoid_base_pkey PRIMARY KEY (vintage, sumlevel, geoid);
+  END IF;
+END
+$$;
+
+DELETE FROM viz.geoid_base
+WHERE vintage = :'vintage';
+
+INSERT INTO viz.geoid_base
+SELECT *
+FROM tmp_geoid_base;
+
+COMMIT;

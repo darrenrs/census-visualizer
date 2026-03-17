@@ -16,7 +16,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-VINTAGE = 'acs2024_5yr'
+VINTAGE = os.getenv('VINTAGE')
+if not VINTAGE:
+  pytest.skip('VINTAGE not set', allow_module_level=True)
+
 TABLE = 'viz.income_derived'
 REL_TOLERANCE = 0.1
 
@@ -32,10 +35,10 @@ COMPUTED_GEOIDS = [
 
 # (geoid, expected_flag_bit) — outputs should all be NULL
 NULL_CASES = [
-  ('15000US490351008001', 4),  # block group
-  ('16000US4948830', 8),  # population too small
+  ('15000US490351008001', 8),  # block group
+  ('16000US4948830', 1),  # population too small
   ('16000US4946410', 16),  # missing thresholds
-  ('16000US5142216', 32),  # all coded/topcoded
+  ('16000US5142216', 16),  # previously topcoded, now just missing thresholds
 ]
 
 NUMERIC_FIELDS = [

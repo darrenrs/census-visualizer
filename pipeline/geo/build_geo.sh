@@ -34,7 +34,7 @@ require_cmd ogrinfo
 require_cmd ogr2ogr
 require_cmd psql
 
-if [[ -z "${DATABASE_URL:-}" && -f "$ROOT_ENV_FILE" ]]; then
+if [[ -f "$ROOT_ENV_FILE" ]]; then
   set -a
   # shellcheck disable=SC1090
   source "$ROOT_ENV_FILE"
@@ -46,7 +46,10 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
   exit 1
 fi
 
-VINTAGE="${VINTAGE:-acs2024_5yr}"
+if [[ -z "${VINTAGE:-}" ]]; then
+  echo "VINTAGE is required (set in .env or environment)." >&2
+  exit 1
+fi
 
 # sumlevel|url
 # Updated through 2024 (ZCTA are still stuck in 2020)

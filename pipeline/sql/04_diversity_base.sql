@@ -1,6 +1,7 @@
-DROP TABLE IF EXISTS viz.diversity_base;
+BEGIN;
 
-CREATE TABLE viz.diversity_base AS
+CREATE TEMP TABLE tmp_diversity_base
+ON COMMIT DROP AS
 SELECT
   g.vintage,
   g.sumlevel,
@@ -24,7 +25,32 @@ SELECT
   viz.clean_int(race.b03002012)               AS race_hispanic,
   (viz.clean_dec(race.b03002012_moe) / 1.645) AS race_hispanic_se
 FROM viz.geoid_base g
-LEFT JOIN acs2024_5yr.b03002_moe race USING (geoid);
+LEFT JOIN :"vintage".b03002_moe race USING (geoid)
+WHERE g.vintage = :'vintage';
 
-ALTER TABLE viz.diversity_base
-ADD CONSTRAINT diversity_base_pkey PRIMARY KEY (vintage, sumlevel, geoid);
+CREATE TABLE IF NOT EXISTS viz.diversity_base (
+  LIKE tmp_diversity_base INCLUDING DEFAULTS
+);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'diversity_base_pkey'
+      AND conrelid = 'viz.diversity_base'::regclass
+  ) THEN
+    ALTER TABLE viz.diversity_base
+    ADD CONSTRAINT diversity_base_pkey PRIMARY KEY (vintage, sumlevel, geoid);
+  END IF;
+END
+$$;
+
+DELETE FROM viz.diversity_base
+WHERE vintage = :'vintage';
+
+INSERT INTO viz.diversity_base
+SELECT *
+FROM tmp_diversity_base;
+
+COMMIT;

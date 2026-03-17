@@ -17,6 +17,9 @@ An ETL pipeline + full-stack website that presents Census data and custom metric
 
 A sample `.env` file is provided at `.env.example`.
 
+- `DATABASE_URL` for Postgres database connection URL
+- `VINTAGE` for census vintage ID (e.g., `acs2024_5yr`)
+  - Note: this only influences the ACS database; you'll need to manually update `pipeline/geo/build_geo.sh` and call `pipeline/vre/download_vre_tables.py` with a different year argument for other years.
 - `PORT_SERVER` for API server
 - `PORT_CLIENT` for Vite dev server
 - `VITE_BASE_PATH` for frontend mount path
@@ -27,14 +30,19 @@ A sample `.env` file is provided at `.env.example`.
 
 ### Running the Pipeline
 
-(This will be integrated into one Makefile soon. From a clean slate this entire process will take about 30 min to complete.)
-(Python tested with 3.12.7; if latest version of Python is failing you'll need to set up a virtual environment.)
+From a clean slate this entire process will take about 30 min to complete. Tested with Python 3.12.7; if latest version of Python is failing you'll need to set up a virtual environment.
+
+#### Makefile
+
+1. Run `make all`.
+
+#### Manual
 
 1. Ensure Postgres is installed and the [Census Reporter ACS data dump](https://censusreporter.tumblr.com/post/73727555158/easier-access-to-acs-data/amp) has been loaded into a new schema.
-2. Run `pipeline/vre/download_vre_tables.py`
+2. Run `pipeline/vre/download_vre_tables.py`.
 3. Run each of the scripts in `pipeline/sql` and `pipeline/python` in order based on their number.
-4. Run `pipeline/geo/build_geo.sh` (ensure dependencies are installed)
-5. Run `pipeline/geo/build_tiles.sh` (ensure dependencies are installed)
+4. Run `pipeline/geo/build_geo.sh` (ensure dependencies are installed.)
+5. Run `pipeline/geo/build_tiles.sh` (ensure dependencies are installed.)
 
 #### Shell Dependencies
 
@@ -49,6 +57,12 @@ A sample `.env` file is provided at `.env.example`.
   - pmtiles
 
 ### Running the Website
+
+#### Makefile
+
+1. Run `make dev`.
+
+#### Manual
 
 1. `cp .env.example .env` and set values
 2. `cd web/server`
@@ -142,9 +156,9 @@ _Five root occupational groups, twenty-five leaf occupational groups, ratio of b
 - Add LICENSE
 - Add Privacy Policy
 - Much more detailed about page with math explanations
-- Make vintage name completely non-hardcoded (input from .env)
-- Make sure all environment variables have proper null handling
-- `requirements.txt` libraries have version numbers for stability
+- (done 2026-03-17) Make vintage name completely non-hardcoded (input from .env)
+- (done 2026-03-17) Make sure all environment variables have proper null handling
+- (done 2026-03-17) `requirements.txt` libraries have version numbers for stability
 - Add graphs/charts (because they are pretty)
 
 ### New Features

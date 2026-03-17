@@ -26,7 +26,10 @@ const pool = new Pool({
 });
 
 const PORT = Number(process.env.PORT_SERVER || 3000);
-const VINTAGE = process.env.VINTAGE || "acs2024_5yr";
+
+const VINTAGE = process.env.VINTAGE;
+if (!VINTAGE) throw new Error("VINTAGE is not set in .env");
+
 const GEO_ASSET_MODE = process.env.GEO_ASSET_MODE || "local";
 const GEO_ASSET_MOUNT = process.env.VITE_GEO_BASE || "/geo";
 const GEO_ASSET_DIR = process.env.GEO_ASSET_DIR || "pipeline/geo/out";

@@ -1,8 +1,13 @@
-import argparse
+import os
+import re
 import zipfile
 from io import BytesIO
 from pathlib import Path
 from urllib.request import Request, urlopen
+
+from dotenv import load_dotenv
+
+VRE_DIR = Path(__file__).resolve().parent
 
 tables = [
   'B15002',  # Sex by Educational Attainment
@@ -41,16 +46,28 @@ statecodes = [
 # fmt: on
 
 
-def download_and_extract(year: int, table: str, sumlvl: str, statecode: str = '') -> None:
+def parse_vintage(vintage: str) -> tuple[int, str]:
+  m = re.fullmatch(r'acs(\d{4})_([15])yr', vintage.strip().lower())
+  if not m:
+    raise RuntimeError('VINTAGE must look like acs2024_5yr or acs2023_1yr.')
+
+  year = int(m.group(1))
+  period = f'{m.group(2)}-year'
+  return year, period
+
+
+def download_and_extract(
+  year: int, period: str, table: str, sumlvl: str, statecode: str = ''
+) -> None:
   statecode_inline = ''
   if statecode != '':
     statecode_inline = f'_{statecode}'
 
   url = (
     f'https://www2.census.gov/programs-surveys/acs/replicate_estimates/'
-    f'{year}/data/5-year/{sumlvl}/{table}{statecode_inline}.csv.zip'
+    f'{year}/data/{period}/{sumlvl}/{table}{statecode_inline}.csv.zip'
   )
-  out_dir = Path(table)
+  out_dir = VRE_DIR / table
   out_dir.mkdir(parents=True, exist_ok=True)
   out_path = out_dir / f'{sumlvl}{statecode_inline}.csv'
 
@@ -69,12 +86,9 @@ def download_and_extract(year: int, table: str, sumlvl: str, statecode: str = ''
 
 
 def concatenate_csv_in_dir(table: str, sumlvl: str) -> None:
-  table_dir = Path(table)
+  table_dir = VRE_DIR / table
   out_path = table_dir / f'{sumlvl}.csv'
-  parts = sorted(
-    p for p in table_dir.glob(f'{sumlvl}_*.csv')
-    if p.is_file()
-  )
+  parts = sorted(p for p in table_dir.glob(f'{sumlvl}_*.csv') if p.is_file())
 
   if not parts:
     return
@@ -96,21 +110,25 @@ def concatenate_csv_in_dir(table: str, sumlvl: str) -> None:
 
 
 if __name__ == '__main__':
-  ap = argparse.ArgumentParser()
-  ap.add_argument('--year', type=int, default=2024)
-  args = ap.parse_args()
+  load_dotenv()
+
+  vintage = os.getenv('VINTAGE')
+  if not vintage:
+    raise RuntimeError('VINTAGE not set (set in .env or environment.)')
+
+  year, period = parse_vintage(vintage)
 
   for i in tables:
     for j in sumlvls_all:
       try:
-        download_and_extract(args.year, i, j)
+        download_and_extract(year, period, i, j)
       except Exception as e:
         print(f'Failed to download or extract {i}/{j}: {e}')
 
     for j in sumlvls_state:
       for k in statecodes:
         try:
-          download_and_extract(args.year, i, j, k)
+          download_and_extract(year, period, i, j, k)
         except Exception as e:
           print(f'Failed to download or extract {i}/{j}_{k}: {e}')
       try:

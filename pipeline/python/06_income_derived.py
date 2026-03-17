@@ -147,7 +147,6 @@ WHERE d.vintage  = t.vintage
   AND d.geoid    = t.geoid;
 """
 
-VINTAGE = 'acs2024_5yr'
 CHUNK_SIZE = 10_000
 SIM_COUNT = 1000
 
@@ -390,29 +389,33 @@ def main() -> None:
   # Load .env from project root
   load_dotenv()
 
+  vintage = os.getenv('VINTAGE')
+  if not vintage:
+    raise RuntimeError('VINTAGE not set (set in .env or environment.)')
+
   db_url = os.getenv('DATABASE_URL')
   if not db_url:
-    raise RuntimeError('DATABASE_URL not set.')
+    raise RuntimeError('DATABASE_URL not set (set in .env or environment.)')
 
   # Two connections: read holds the server-side cursor; write commits per chunk.
   with psycopg.connect(db_url) as read_conn, psycopg.connect(db_url) as write_conn:
     # Setup on write conn
     with write_conn.cursor() as cur:
       cur.execute(QUERY_CREATE_TABLE)
-      cur.execute(QUERY_RESET_TABLE, (VINTAGE,))
-      cur.execute(QUERY_POPULATE_TABLE, (VINTAGE,))
+      cur.execute(QUERY_RESET_TABLE, (vintage,))
+      cur.execute(QUERY_POPULATE_TABLE, (vintage,))
       cur.execute(
         QUERY_FLAG_BLOCK_GROUPS,
         (
           FLAG_NOT_COMPUTABLE_BG,
-          VINTAGE,
+          vintage,
         ),
       )
       cur.execute(
         QUERY_FLAG_GEOGRAPHIES_TOO_SMALL,
         (
           FLAG_POP_TOO_SMALL,
-          VINTAGE,
+          vintage,
         ),
       )
     write_conn.commit()
@@ -422,7 +425,7 @@ def main() -> None:
       cur.execute(
         QUERY_FETCH_ALL,
         (
-          VINTAGE,
+          vintage,
           FLAG_POP_TOO_SMALL,
         ),
       )

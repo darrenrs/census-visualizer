@@ -12,7 +12,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-VINTAGE = 'acs2024_5yr'
+VINTAGE = os.getenv('VINTAGE')
+if not VINTAGE:
+  pytest.skip('VINTAGE not set', allow_module_level=True)
+
 TABLE = 'viz.diversity_derived'
 REL_TOLERANCE = 1e-6
 ABS_TOLERANCE = 1e-6
@@ -25,7 +28,7 @@ GEOIDS = [
 ]
 
 NULL_CASE_GEOID = '16000US4948830'
-NULL_CASE_FLAG_BIT = 8
+NULL_CASE_FLAG_BIT = 1
 
 GOLDEN_FILE = Path(__file__).parent / 'test_diversity.json'
 GOLDEN_FIELDS = [

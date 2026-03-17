@@ -1,6 +1,7 @@
-DROP TABLE IF EXISTS viz.education_base;
+BEGIN;
 
-CREATE TABLE viz.education_base AS
+CREATE TEMP TABLE tmp_education_base
+ON COMMIT DROP AS
 SELECT
   g.vintage,
   g.sumlevel,
@@ -90,7 +91,32 @@ SELECT
   viz.clean_int(edu.b15002035)               AS edu_doctorate_degree_f,
   (viz.clean_dec(edu.b15002035_moe) / 1.645) AS edu_doctorate_degree_f_se
 FROM viz.geoid_base g
-LEFT JOIN acs2024_5yr.b15002_moe edu USING (geoid);
+LEFT JOIN :"vintage".b15002_moe edu USING (geoid)
+WHERE g.vintage = :'vintage';
 
-ALTER TABLE viz.education_base
-ADD CONSTRAINT education_base_pkey PRIMARY KEY (vintage, sumlevel, geoid);
+CREATE TABLE IF NOT EXISTS viz.education_base (
+  LIKE tmp_education_base INCLUDING DEFAULTS
+);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'education_base_pkey'
+      AND conrelid = 'viz.education_base'::regclass
+  ) THEN
+    ALTER TABLE viz.education_base
+    ADD CONSTRAINT education_base_pkey PRIMARY KEY (vintage, sumlevel, geoid);
+  END IF;
+END
+$$;
+
+DELETE FROM viz.education_base
+WHERE vintage = :'vintage';
+
+INSERT INTO viz.education_base
+SELECT *
+FROM tmp_education_base;
+
+COMMIT;

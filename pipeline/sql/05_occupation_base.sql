@@ -1,6 +1,7 @@
-DROP TABLE IF EXISTS viz.occupation_base;
+BEGIN;
 
-CREATE TABLE viz.occupation_base AS
+CREATE TEMP TABLE tmp_occupation_base
+ON COMMIT DROP AS
 SELECT
   g.vintage,
   g.sumlevel,
@@ -46,17 +47,17 @@ SELECT
   (viz.clean_dec(occ.c24010006_moe) / 1.645) AS occ_leaf_bus_fin_m_se,
   viz.clean_int(occ.c24010042)               AS occ_leaf_bus_fin_f,
   (viz.clean_dec(occ.c24010042_moe) / 1.645) AS occ_leaf_bus_fin_f_se,
- 
+
   viz.clean_int(occ.c24010008)               AS occ_leaf_comp_math_m,
   (viz.clean_dec(occ.c24010008_moe) / 1.645) AS occ_leaf_comp_math_m_se,
   viz.clean_int(occ.c24010044)               AS occ_leaf_comp_math_f,
   (viz.clean_dec(occ.c24010044_moe) / 1.645) AS occ_leaf_comp_math_f_se,
- 
+
   viz.clean_int(occ.c24010009)               AS occ_leaf_eng_m,
   (viz.clean_dec(occ.c24010009_moe) / 1.645) AS occ_leaf_eng_m_se,
   viz.clean_int(occ.c24010045)               AS occ_leaf_eng_f,
   (viz.clean_dec(occ.c24010045_moe) / 1.645) AS occ_leaf_eng_f_se,
- 
+
   viz.clean_int(occ.c24010010)               AS occ_leaf_sci_m,
   (viz.clean_dec(occ.c24010010_moe) / 1.645) AS occ_leaf_sci_m_se,
   viz.clean_int(occ.c24010046)               AS occ_leaf_sci_f,
@@ -161,9 +162,33 @@ SELECT
   (viz.clean_dec(occ.c24010037_moe) / 1.645) AS occ_leaf_mat_mov_m_se,
   viz.clean_int(occ.c24010073)               AS occ_leaf_mat_mov_f,
   (viz.clean_dec(occ.c24010073_moe) / 1.645) AS occ_leaf_mat_mov_f_se
-
 FROM viz.geoid_base g
-LEFT JOIN acs2024_5yr.c24010_moe occ USING (geoid);
+LEFT JOIN :"vintage".c24010_moe occ USING (geoid)
+WHERE g.vintage = :'vintage';
 
-ALTER TABLE viz.occupation_base
-ADD CONSTRAINT occupation_base_pkey PRIMARY KEY (vintage, sumlevel, geoid);
+CREATE TABLE IF NOT EXISTS viz.occupation_base (
+  LIKE tmp_occupation_base INCLUDING DEFAULTS
+);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'occupation_base_pkey'
+      AND conrelid = 'viz.occupation_base'::regclass
+  ) THEN
+    ALTER TABLE viz.occupation_base
+    ADD CONSTRAINT occupation_base_pkey PRIMARY KEY (vintage, sumlevel, geoid);
+  END IF;
+END
+$$;
+
+DELETE FROM viz.occupation_base
+WHERE vintage = :'vintage';
+
+INSERT INTO viz.occupation_base
+SELECT *
+FROM tmp_occupation_base;
+
+COMMIT;
