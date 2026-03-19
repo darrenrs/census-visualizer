@@ -8,10 +8,11 @@ endif
 SQL_BASE_SCRIPTS := $(sort $(wildcard pipeline/sql/0[0-5]_*.sql))
 PYTHON_SCRIPTS := $(sort $(wildcard pipeline/python/[0-9][0-9]_*.py))
 
-.PHONY: help check-env vre sql_base python sql_contract geo tiles dev dev-server dev-client pipeline all
+.PHONY: help check-env doctor vre sql_base python sql_contract geo tiles dev dev-server dev-client pipeline all
 
 help:
 	@echo "Available targets:"
+	@echo "  make doctor        - Check env vars, commands, and DB connectivity"
 	@echo "  make vre           - Download VRE tables"
 	@echo "  make sql_base      - Run SQL base pipeline (00-05)"
 	@echo "  make python        - Run Python derived pipeline (06-09)"
@@ -27,6 +28,47 @@ help:
 check-env:
 	@test -n "$(DATABASE_URL)" || (echo "DATABASE_URL is required (set it in .env or shell)." && exit 1)
 	@test -n "$(VINTAGE)" || (echo "VINTAGE is required (set it in .env or shell)." && exit 1)
+
+doctor: check-env
+	@echo "==> Environment"
+	@echo "DATABASE_URL=$$(printf '%s' "$(DATABASE_URL)" | sed 's#://.*@#://***@#')"
+	@echo "VINTAGE=$(VINTAGE)"
+	@echo
+	@echo "==> Core commands"
+	@for cmd in psql python3 node npm curl unzip ogrinfo ogr2ogr; do \
+		if command -v "$$cmd" >/dev/null 2>&1; then \
+			echo "[ok] $$cmd -> $$(command -v "$$cmd")"; \
+		else \
+			echo "[missing] $$cmd"; \
+			exit 1; \
+		fi; \
+	done
+	@echo
+	@echo "==> Optional commands"
+	@for cmd in tippecanoe pmtiles; do \
+		if command -v "$$cmd" >/dev/null 2>&1; then \
+			echo "[ok] $$cmd -> $$(command -v "$$cmd")"; \
+		else \
+			echo "[warn] $$cmd not found (only needed for tile build)"; \
+		fi; \
+	done
+	@echo
+	@echo "==> Tool versions"
+	@echo "python3: $$(python3 --version 2>/dev/null)"
+	@echo "node: $$(node --version 2>/dev/null)"
+	@echo "npm: $$(npm --version 2>/dev/null)"
+	@echo
+	@echo "==> Database connectivity"
+	@psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -c "SELECT 1;" >/dev/null
+	@echo "[ok] Connected to database"
+	@psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -tA -c "SELECT 1 FROM pg_namespace WHERE nspname = '$(VINTAGE)';" | grep -q '^1$$'
+	@echo "[ok] Found source schema: $(VINTAGE)"
+	@psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -tA -c "SELECT 1 FROM pg_namespace WHERE nspname = 'viz';" | grep -q '^1$$' \
+		&& echo "[ok] Found schema: viz" \
+		|| echo "[info] Schema 'viz' not present yet (it will be created by the pipeline)"
+	@psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -tA -c "SELECT 1 FROM pg_namespace WHERE nspname = 'api';" | grep -q '^1$$' \
+		&& echo "[ok] Found schema: api" \
+		|| echo "[info] Schema 'api' not present yet (it will be created by the pipeline)"
 
 vre: check-env
 	@echo "==> Downloading VRE tables"

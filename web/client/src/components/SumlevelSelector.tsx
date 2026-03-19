@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { type Sumlevel, type GeographyListResponse } from "@/types/api.ts";
 
 type SumlevelSelectorProps = {
@@ -13,6 +14,8 @@ export function SumlevelSelector({
   geographyListResponse,
   geographyListError,
 }: SumlevelSelectorProps) {
+  const [isCompact, setIsCompact] = useState(false);
+
   if (geographyListError) {
     return (
       <div className="sumlevel-selector">
@@ -31,7 +34,23 @@ export function SumlevelSelector({
     ) || null;
 
   return (
-    <div className="sumlevel-selector">
+    <div
+      className={`sumlevel-selector ${isCompact ? "is-compact" : "is-expanded"}`}
+    >
+      <button
+        type="button"
+        className="sumlevel-selector-toggle"
+        onClick={() => setIsCompact((value) => !value)}
+        aria-expanded={!isCompact}
+        aria-label={
+          isCompact
+            ? "Expand geography type selector"
+            : "Collapse geography type selector"
+        }
+        title={isCompact ? "Expand" : "Minimize"}
+      >
+        {isCompact ? "\u26F6" : "\u2212"}
+      </button>
       <div className="sumlevel-selector-buttons">
         {geographyListResponse.geographies.map((geographyItem) => {
           const isActive = geographyItem.sumlevel === activeSumlevel;
@@ -52,6 +71,9 @@ export function SumlevelSelector({
           );
         })}
       </div>
+      <h3 className="sumlevel-selector-title">
+        {selectedItem ? `${selectedItem.label}` : "Choose a geography type."}
+      </h3>
       <p className="sumlevel-selector-meta">
         {selectedItem
           ? `${selectedItem.description}`

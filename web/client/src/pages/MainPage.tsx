@@ -87,8 +87,8 @@ export default function MainPage() {
       const startX = event.clientX;
       const startWidth = panelEl.getBoundingClientRect().width;
       const shellWidth = shellEl.getBoundingClientRect().width;
-      const minWidth = 420;
-      const maxWidth = Math.max(minWidth, shellWidth - 420);
+      const minWidth = 330;
+      const maxWidth = Math.max(minWidth, shellWidth - 360);
 
       const previousCursor = document.body.style.cursor;
       const previousSelect = document.body.style.userSelect;
@@ -128,7 +128,7 @@ export default function MainPage() {
       event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
       const shellRect = shellEl.getBoundingClientRect();
-      const minMapHeight = 180;
+      const minMapHeight = 220;
       const maxMapHeight = Math.max(minMapHeight + 40, shellRect.height - 120);
 
       const previousCursor = document.body.style.cursor;
@@ -172,6 +172,9 @@ export default function MainPage() {
       try {
         const response = await fetch(
           `${apiBase}/v1/geography/${normalizedGeoid}`,
+          {
+            signal: AbortSignal.timeout(5000),
+          },
         );
 
         if (!response.ok) {
@@ -193,7 +196,14 @@ export default function MainPage() {
       } catch (error) {
         console.error("Error fetching geography:", error);
         setGeographyResponse(null);
-        setGeographyError("Could not reach the API. Please try again.");
+
+        if (error instanceof DOMException && error.name === "TimeoutError") {
+          setGeographyError(
+            "Request timed out. Please check your connection and try again.",
+          );
+        } else {
+          setGeographyError("Could not reach the API. Please try again.");
+        }
       } finally {
         setIsGeographyLoading(false);
       }
@@ -210,7 +220,9 @@ export default function MainPage() {
     const fetchGeographyList = async () => {
       setGeographyListError(null);
       try {
-        const response = await fetch(`${apiBase}/v1/geographies`);
+        const response = await fetch(`${apiBase}/v1/geographies`, {
+          signal: AbortSignal.timeout(5000),
+        });
         if (!response.ok) {
           const errorMessage = await readApiError(response);
           setGeographyListError(errorMessage);
@@ -221,8 +233,17 @@ export default function MainPage() {
         setGeographyListResponse(data);
       } catch (error) {
         console.error("Error fetching geographies:", error);
-        setGeographyListError("Could not load geography types.");
         setGeographyListResponse(null);
+
+        if (error instanceof DOMException && error.name === "TimeoutError") {
+          setGeographyListError(
+            "Request timed out. Please check your connection and try again.",
+          );
+        } else {
+          setGeographyListError(
+            "Could not load geography types. Please try again.",
+          );
+        }
       }
     };
 

@@ -19,7 +19,7 @@ A sample `.env` file is provided at `.env.example`.
 
 - `DATABASE_URL` for Postgres database connection URL
 - `VINTAGE` for census vintage ID (e.g., `acs2024_5yr`)
-  - Note: this only influences the ACS database; you'll need to manually update `pipeline/geo/build_geo.sh` and call `pipeline/vre/download_vre_tables.py` with a different year argument for other years.
+  - Note: this only influences the ACS database and VRE estimates; you'll need to manually update the URLs in `pipeline/geo/build_geo.sh` for a different set of geography tiles
 - `PORT_SERVER` for API server
 - `PORT_CLIENT` for Vite dev server
 - `VITE_BASE_PATH` for frontend mount path
@@ -60,7 +60,8 @@ From a clean slate this entire process will take about 30 min to complete. Teste
 
 #### Makefile
 
-1. Run `make dev`.
+1. `cp .env.example .env` and set values
+2. Run `make dev`.
 
 #### Manual
 
@@ -94,87 +95,247 @@ Metrics are listed with their ACS table if applicable. Flags are used to describ
 - GEOID (Primary Key)
 - Vintage (e.g., `acs2024_5yr`)
 - Summary Level (integer)
+  - 010: United States of America
+  - 040: State or State-equivalent
+  - 050: County or County-equivalent
+  - 060: County Subdivision
+  - 140: Tract
+  - 150: Block Group
+  - 160: Place
+  - 310: Metropolitan or Micropolitan Statistical Area
+  - 500: Congressional District (119th Congress)
+  - 860: Zip Code Tabulation Area
 - Name
 - State Code (e.g., `CA`)
-
-#### Summary Levels
-
-- 010: United States of America
-- 040: State or State-equivalent
-- 050: County or County-equivalent
-- 060: County Subdivision
-- 140: Tract
-- 150: Block Group
-- 160: Place
-- 310: Metropolitan or Micropolitan Statistical Area
-- 500: Congressional District (119th Congress)
-- 860: Zip Code Tabulation Area
 
 ### Core Demographics
 
 - Total Population (B01003)
+  - _Margins of Error are missing for large geographies for some reason_
 - Total Households (B11001)
 - Average Household Size (B25010)
 
 ### Income
 
-_Household income percentile extremes and confidence intervals estimated by Pareto distribution function._
+_Median and selected percentile ranks (observed and extrapolated via Pareto function) for household income and Gini coefficient of income inequality._
+
+#### Tables
 
 - Median Household Income (B19013)
 - Household Income Thresholds at percentiles 20, 40, 60, 80, and 95 (B19080)
-  - _Census topcodes values above $250,000 as "250001"_
+  - _Census topcodes values above $250,000 as "250001" and are effectively unusable as point estimates_
 - Mean Household Income of quintiles 2, 3, 4, 5 and top 5% (B19081)
-  - _These values are not topcoded_
+  - _These values are not topcoded and can be used_
 - Gini Index of Income Inequality (B19083)
+
+#### Formulae
+
+Illustrative Pareto tail model:
+
+$$
+\Pr(X \ge x) = \left(\frac{x_m}{x}\right)^\alpha
+\quad \text{for } x \ge x_m,\ \alpha > 0
+$$
+
+which implies the corresponding quantile function:
+
+$$
+Q(p) = \frac{x_m}{(1-p)^{1/\alpha}}
+\quad \text{for } 0 < p < 1
+$$
+
+In the simulation code, this is reparameterized as:
+
+$$
+\frac{\mu_s - T_s}{\mu_s} = \frac{1}{\alpha}
+$$
+
+where $T_s$ is a simulated threshold draw and $\mu_s$ is a simulated conditional mean draw above that threshold.
+
+Examples of what gets plugged in from the pipeline:
+
+- Standard upper-tail fit above the 95th percentile:
+  - $p_0 = 0.95$
+  - $T = \texttt{hhi\_p95}$
+  - $\mu = \texttt{hhi\_top5\_mean}$
+- Standard upper-tail fit above the 80th percentile:
+  - $p_0 = 0.80$
+  - $T = \texttt{hhi\_p80}$
+  - $\mu = \texttt{hhi\_q5\_mean}$
+- Means-only fallback when observed upper quantiles are topcoded:
+  - $\mu_{80} = \texttt{hhi\_q5\_mean}$
+  - $\mu_{95} = \texttt{hhi\_top5\_mean}$
+  - then infer a latent $P_{80}$ and extrapolate the tail from there
+- Segment repair for the 80th to 95th percentile range:
+  - $T_{\mathrm{lo}} = \texttt{hhi\_p80}$
+  - $T_{\mathrm{hi}} = \texttt{hhi\_p95}$
+  - $p_{\mathrm{lo}} = 0.80$
+  - $p_{\mathrm{hi}} = 0.95$
+  - use this segment to estimate $P_{90}$
 
 ### Education
 
 _Normalized index in the range 0-100, plus estimated years of schooling. Confidence intervals derived from Variance Replicate Estimate tables._
 
+#### Tables
+
 - Educational Attainment by Sex (B15002)
+
+#### Incomes
+
+Illustrative weighted-attainment formula:
+
+$$
+\mathrm{EI}
+=
+\frac{\sum_n w_n \left(M_n + F_n\right)}
+{\sum_n \left(M_n + F_n\right)}
+$$
+
+where $M_n$ and $F_n$ are the male and female counts in attainment bucket $n$.
+
+In the pipeline, this is implemented with explicit bucket weights such as:
+
+$$
+\frac{
+0.00(\texttt{edu\_no\_schooling\_m} + \texttt{edu\_no\_schooling\_f})
+ + 0.10(\texttt{edu\_grade\_0\_4\_m} + \texttt{edu\_grade\_0\_4\_f})
+ + \cdots
+ + 3.00(\texttt{edu\_doctorate\_degree\_m} + \texttt{edu\_doctorate\_degree\_f})
+}{
+\texttt{edu\_population}
+}
+$$
+
+Estimated years of schooling uses the same structure with year-based weights instead of normalized education-index weights:
+
+$$
+\mathrm{YOS}
+=
+\frac{\sum_n y_n \left(M_n + F_n\right)}
+{\sum_n \left(M_n + F_n\right)}
+$$
 
 ### Racial/Ethnic Diversity
 
 _Normalized index in the range 0-100. Confidence intervals derived from Variance Replicate Estimate tables._
 
+#### Tables
+
 - Hispanic or Latino Origin by Race (B03002)
+
+#### Formulae
+
+Illustrative Simpson diversity formula:
+
+$$
+D = 1 - \sum_k p_k^2
+$$
+
+where $p_k = c_k / N$ is the share of category $k$ in the total population $N$.
+
+In the pipeline, this is implemented as:
+
+$$
+D
+=
+1
+-
+\frac{
+\texttt{race\_white\_nh}^2
++ \texttt{race\_black\_nh}^2
++ \texttt{race\_aian\_nh}^2
++ (\texttt{race\_asian\_nh} + \texttt{race\_nhpi\_nh})^2
++ (\texttt{race\_other\_nh} + \texttt{race\_multi\_nh})^2
++ \texttt{race\_hispanic}^2
+}{
+\texttt{total\_population}^2
+}
+$$
 
 ### Occupational Diversity
 
 _Five root occupational groups, twenty-five leaf occupational groups, ratio of basic to extended index. Confidence intervals derived from Variance Replicate Estimate tables._
 
+#### Tables
+
 - Detailed Occupation Breakdown (C24010)
 
-## Todo (2026-03-14)
+#### Formulae
+
+Illustrative Hill-number concentration formula:
+
+$$
+H = \frac{1}{\sum_k p_k^2}
+=
+\frac{N^2}{\sum_k c_k^2}
+$$
+
+where $c_k$ is the count in occupation category $k$ and $N$ is the total employed population represented by the table.
+
+In the pipeline, the root occupation index is implemented as:
+
+$$
+\mathrm{OccRoot}
+=
+\frac{\texttt{occ\_population}^2}{
+\sum_{k \in \text{5 root groups}} (M_k + F_k)^2
+}
+$$
+
+and the extended occupation index is:
+
+$$
+\mathrm{OccExt}
+=
+\frac{\texttt{occ\_population}^2}{
+\sum_{k \in \text{25 leaf groups}} (M_k + F_k)^2
+}
+$$
+
+The reported occupation ratio is then:
+
+$$
+\mathrm{OccRatio}
+=
+\frac{\sum_{k \in \text{5 root groups}} (M_k + F_k)^2}
+{\sum_{k \in \text{25 leaf groups}} (M_k + F_k)^2}
+=
+\frac{\mathrm{OccExt}}{\mathrm{OccRoot}}
+$$
+
+## Todo (2026-03-18)
 
 ### Improvements
 
-- Show state code in GeographyPanel
-- Show full path (block group in X County, in X State ...) in GeographyPanel
-- Add simple geography search
-- Add address geocoder from Census Geocoder API
-- Add LICENSE
-- Add Privacy Policy
-- Much more detailed about page with math explanations
-- (done 2026-03-17) Make vintage name completely non-hardcoded (input from .env)
-- (done 2026-03-17) Make sure all environment variables have proper null handling
-- (done 2026-03-17) `requirements.txt` libraries have version numbers for stability
-- Add graphs/charts (because they are pretty)
+- (done 2026-03-18) Add LICENSE
+- (done 2026-03-18) Make sure Docs are all up to date, better API examples
+- (done 2026-03-18) Add Privacy Policy
+- (done 2026-03-18) Add `make doctor` command
+- (done 2026-03-18) Make SumlevelSelector hideable
+- (done 2026-03-18) Add horizontal scroll indicator to GeographyPanel
+- (v1.1) Show state code in GeographyPanel
+- (v1.1) Add simple geography search
+- (v1.1) Add address geocoder from Census Geocoder API
+- (v1.1) Much more detailed about page with math explanations
+- (v1.2) Show full path (block group in X County, in X State ...) in GeographyPanel
+- (v1.2+) Add graphs/charts (because they are pretty)
 
 ### New Features
 
-- Add percentile ranks for attributes
-- Add separate pages for leaderboards (e.g., top places by education index)
-- Compare two or more geographies
-- Add more attributes
-- Introduce clustering algorithms (branching into ML now)
+- (v1.2) Add percentile ranks for attributes
+- (v1.2) Add separate pages for leaderboards (e.g., top places by education index)
+- (v1.2+) Compare two or more geographies
+- (v1.2+) Compare two or more years
+- (v1.2+) Add more attributes
+- (v1.3) Introduce clustering algorithms (branching into ML now)
 
 ### Bugs
 
 _These are also in GitHub Issues_
 
-- Medium Priority: Disconnected from WiFi on iPhone browser (leaving LAN), then attempted to load a geography. Got stuck on "Loading" forever. Upon reconnect page immediately refreshed and was fine. Not sure what this means for "normal connection lost". (Addendum: also tested "API server is just down" and it worked normally. The weird behavior was only when disconnected from LAN.)
-- Low Priority: If an offline error occurred, trying to load the same GEOID will not trigger anything even if network reconnects. User can load another geography then go back to the original one and both will work, it's just the initial state seems to be stuck if you try to reload same one.
+- (fixed 2026-03-18) Medium Priority: Disconnected from WiFi on iPhone browser (leaving LAN), then attempted to load a geography. Got stuck on "Loading" forever. Upon reconnect page immediately refreshed and was fine. Not sure what this means for "normal connection lost". (Addendum: also tested "API server is just down" and it worked normally. The weird behavior was only when disconnected from LAN.)
+- (v1.1) Low Priority: If an offline error occurred, trying to load the same GEOID will not trigger anything even if network reconnects. User can load another geography then go back to the original one and both will work, it's just the initial state seems to be stuck if you try to reload same one.
 
 ## Acknowledgements
 

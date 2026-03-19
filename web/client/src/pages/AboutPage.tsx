@@ -30,9 +30,11 @@ export default function AboutPage() {
             Definitions/math will be added here soon. Please check the README
             for technical info.
           </p>
+          <p>
+            <Link to={"/privacy"}>Click here to read the Privacy Policy.</Link>
+          </p>
 
-          {/* uncomment when added LICENSE */}
-          {/* <p>&copy; 2026 Darren R. Skidmore. All rights reserved.</p> */}
+          <p>&copy; 2026 Darren R. Skidmore</p>
         </div>
       </main>
     </div>
