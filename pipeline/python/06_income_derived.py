@@ -32,8 +32,11 @@ CREATE TABLE IF NOT EXISTS viz.income_derived (
   hhi_sim_acc       double precision,
   flags             integer NOT NULL default 0,
 
-  PRIMARY KEY (vintage, sumlevel, geoid)
+  PRIMARY KEY (vintage, geoid)
 );
+
+CREATE INDEX IF NOT EXISTS income_derived_vintage_sumlevel_idx
+  ON viz.income_derived (vintage, sumlevel);
 """
 
 QUERY_RESET_TABLE = 'DELETE FROM viz.income_derived WHERE vintage = %s;'
@@ -51,7 +54,6 @@ SET flags = (d.flags | %s)
 FROM viz.geoid_base g
 WHERE d.vintage = %s
   AND d.vintage = g.vintage
-  AND d.sumlevel = g.sumlevel
   AND d.geoid = g.geoid
   AND (
     g.total_population < 250
@@ -85,7 +87,7 @@ SELECT
 
 FROM viz.income_derived d
 JOIN viz.income_base b
-  ON b.vintage=d.vintage AND b.sumlevel=d.sumlevel AND b.geoid=d.geoid
+  ON b.vintage=d.vintage AND b.geoid=d.geoid
 WHERE d.vintage = %s
   AND (d.flags & %s) = 0
   AND d.sumlevel != 150;
@@ -143,7 +145,6 @@ SET
   flags             = (d.flags | t.flags)
 FROM tmp_income_derived t
 WHERE d.vintage  = t.vintage
-  AND d.sumlevel = t.sumlevel
   AND d.geoid    = t.geoid;
 """
 

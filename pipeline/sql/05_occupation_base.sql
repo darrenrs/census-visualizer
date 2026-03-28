@@ -163,26 +163,18 @@ SELECT
   viz.clean_int(occ.c24010073)               AS occ_leaf_mat_mov_f,
   (viz.clean_dec(occ.c24010073_moe) / 1.645) AS occ_leaf_mat_mov_f_se
 FROM viz.geoid_base g
-LEFT JOIN :"vintage".c24010_moe occ USING (geoid)
+LEFT JOIN raw.c24010_moe occ
+  ON occ.vintage = g.vintage
+ AND occ.geoid = g.geoid
 WHERE g.vintage = :'vintage';
 
 CREATE TABLE IF NOT EXISTS viz.occupation_base (
-  LIKE tmp_occupation_base INCLUDING DEFAULTS
+  LIKE tmp_occupation_base INCLUDING DEFAULTS,
+  PRIMARY KEY (vintage, geoid)
 );
 
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'occupation_base_pkey'
-      AND conrelid = 'viz.occupation_base'::regclass
-  ) THEN
-    ALTER TABLE viz.occupation_base
-    ADD CONSTRAINT occupation_base_pkey PRIMARY KEY (vintage, sumlevel, geoid);
-  END IF;
-END
-$$;
+CREATE INDEX IF NOT EXISTS occupation_base_vintage_sumlevel_idx
+ON viz.occupation_base (vintage, sumlevel);
 
 DELETE FROM viz.occupation_base
 WHERE vintage = :'vintage';

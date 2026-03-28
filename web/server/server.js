@@ -99,6 +99,14 @@ LEFT JOIN counts c
   ON c.sumlevel = s.sumlevel;
 `;
 
+const QUERY_VINTAGE_EXISTS = `
+SELECT EXISTS (
+  SELECT 1
+  FROM api.geoid_v1
+  WHERE vintage = $1
+) AS has_data;
+`;
+
 const QUERY_GEOGRAPHY = `
 WITH target AS (
   SELECT
@@ -148,21 +156,25 @@ SELECT jsonb_build_object(
 FROM target t
 LEFT JOIN api.income_v1 i
   ON i.vintage = t.vintage
- AND i.sumlevel = t.sumlevel
  AND i.geoid = t.geoid
 LEFT JOIN api.education_v1 e
   ON e.vintage = t.vintage
- AND e.sumlevel = t.sumlevel
  AND e.geoid = t.geoid
 LEFT JOIN api.diversity_v1 d
   ON d.vintage = t.vintage
- AND d.sumlevel = t.sumlevel
  AND d.geoid = t.geoid
 LEFT JOIN api.occupation_v1 o
   ON o.vintage = t.vintage
- AND o.sumlevel = t.sumlevel
  AND o.geoid = t.geoid;
 `;
+
+function resolveVintage(req) {
+  const requestedVintage = req.query.vintage;
+  if (typeof requestedVintage === "string" && requestedVintage.trim() !== "") {
+    return requestedVintage.trim();
+  }
+  return VINTAGE;
+}
 
 app.get("/api/v1/health", async (_req, res, next) => {
   try {
@@ -175,7 +187,12 @@ app.get("/api/v1/health", async (_req, res, next) => {
 
 app.get("/api/v1/geographies", async (req, res, next) => {
   try {
-    const vintage = VINTAGE;
+    const vintage = resolveVintage(req);
+    const existsResult = await pool.query(QUERY_VINTAGE_EXISTS, [vintage]);
+    if (!existsResult.rows[0]?.has_data) {
+      res.status(404).json({ error: "Vintage not found" });
+      return;
+    }
     const result = await pool.query(QUERY_GEOGRAPHIES, [vintage]);
     res.json(result.rows[0].payload);
   } catch (err) {
@@ -186,7 +203,7 @@ app.get("/api/v1/geographies", async (req, res, next) => {
 app.get("/api/v1/geography/:geoid", async (req, res, next) => {
   try {
     const geoid = req.params.geoid;
-    const vintage = VINTAGE;
+    const vintage = resolveVintage(req);
 
     if (!geoid) {
       res.status(400).json({ error: "GEOID is missing or invalid" });

@@ -4,7 +4,7 @@ An ETL pipeline + full-stack website that presents Census data and custom metric
 
 ## Features
 
-- Robust data pipeline from raw Census Reporter American Community Survey (ACS) data into Postgres offering support for more than 400,000 geographies
+- Robust data pipeline from American Community Survey (ACS) data into Postgres offering support for more than 400,000 geographies
 - Derived metrics such as upper income percentiles using Pareto curves and normalized education, racial/ethnic diversity, and occupation indices
 - 90% margin of errors for all computable fields from Census variance replicate tables or Monte Carlo simulation
 - Node/Express API server that gets all information for any geography in one request
@@ -17,9 +17,13 @@ An ETL pipeline + full-stack website that presents Census data and custom metric
 
 A sample `.env` file is provided at `.env.example`.
 
-- `DATABASE_URL` for Postgres database connection URL
-- `VINTAGE` for census vintage ID (e.g., `acs2024_5yr`)
-  - Note: this only influences the ACS database and VRE estimates; you'll need to manually update the URLs in `pipeline/geo/build_geo.sh` for a different set of geography tiles
+- `VINTAGE` for primary/active ACS vintage ID (e.g., `acs2024_5yr`)
+- `DATABASE_URL` for the target Postgres database connection URL
+- `SOURCE_DATABASE_URL` optional source Postgres database URL for sql-based raw ingest
+- `RAW_INGEST_MODE` with `dump|sql`
+  - `dump` downloads official ACS Summary File `.dat` files from 2018 and newer to `pipeline/ingest/work/<VINTAGE>` (strongly recommended)
+  - `sql` uses a PostgreSQL server with a loaded Census Reporter database dump
+  - Note: `VINTAGE` influences raw ACS ingest, downstream pipeline output, and VRE estimates; you'll still need to manually update the URLs in `pipeline/geo/build_geo.sh` for a different set of geography tiles
 - `PORT_SERVER` for API server
 - `PORT_CLIENT` for Vite dev server
 - `VITE_BASE_PATH` for frontend mount path
@@ -35,14 +39,19 @@ From a clean slate this entire process will take about 30 min to complete. Teste
 #### Makefile
 
 1. Run `make all`.
+2. Or run `make ingest_sql` or `make ingest_dump` explicitly before `make sql_base`.
 
 #### Manual
 
-1. Ensure Postgres is installed and the [Census Reporter ACS data dump](https://censusreporter.tumblr.com/post/73727555158/easier-access-to-acs-data/amp) has been loaded into a new schema.
-2. Run `pipeline/vre/download_vre_tables.py`.
-3. Run each of the scripts in `pipeline/sql` and `pipeline/python` in order based on their number.
-4. Run `pipeline/geo/build_geo.sh` (ensure dependencies are installed.)
-5. Run `pipeline/geo/build_tiles.sh` (ensure dependencies are installed.)
+1. Ensure Postgres is installed.
+2. Choose a raw ingest path:
+   - SQL mode: set `RAW_INGEST_MODE=sql`, load the Census Reporter ACS dump into a schema named after `VINTAGE`, then run `python3 pipeline/ingest/ingest_sql.py`.
+   - Dump mode: set `RAW_INGEST_MODE=dump`, then run `python3 pipeline/ingest/ingest_dump.py` to download and load official ACS Summary File `.dat` files for `acs2018_5yr` and newer.
+3. Run `python3 pipeline/vre/download_vre_tables.py`.
+   This writes per-vintage VRE files under `pipeline/vre/work/<VINTAGE>/<TABLE>/`.
+4. Run each of the scripts in `pipeline/sql` and `pipeline/python` in order based on their number.
+5. Run `python3 pipeline/geo/build_geo.sh` (ensure dependencies are installed.)
+6. Run `python3 pipeline/geo/build_tiles.sh` (ensure dependencies are installed.)
 
 #### Shell Dependencies
 
@@ -78,10 +87,14 @@ From a clean slate this entire process will take about 30 min to complete. Teste
 The Express API currently exposes:
 
 - `GET /api/v1/geographies`
+  - Query params:
+    - `vintage` (optional, defaults to `VINTAGE`)
   - Gets list and count of all geography summary levels
 - `GET /api/v1/geography/:geoid`
   - Path params:
     - `geoid` (required)
+  - Query params:
+    - `vintage` (optional, defaults to `VINTAGE`)
   - Response keys:
     - `geography`, `core`, `income`, `education`, `diversity`, `occupation`
     - `geography` and `core` are always available. The others may be `null` for certain geographies.
@@ -306,23 +319,22 @@ $$
 
 ## Todo (2026-03-18)
 
-### Improvements
+## Improvements
 
-- (done 2026-03-18) Add LICENSE
-- (done 2026-03-18) Make sure Docs are all up to date, better API examples
-- (done 2026-03-18) Add Privacy Policy
-- (done 2026-03-18) Add `make doctor` command
-- (done 2026-03-18) Make SumlevelSelector hideable
-- (done 2026-03-18) Add horizontal scroll indicator to GeographyPanel
-- (v1.1) Show state code in GeographyPanel
+- (v1.1) Remove pipeline file names having numbers
+- (v1.1) Add window title
+- (v1.1) Add basic favicon
+- (v1.1) Show `state_code` in GeographyPanel
 - (v1.1) Add simple geography search
-- (v1.1) Add address geocoder from Census Geocoder API
-- (v1.1) Much more detailed about page with math explanations
+- (v1.2) Add address geocoder from Census Geocoder API
+- (v1.2) Much more detailed about page with math explanations
 - (v1.2) Show full path (block group in X County, in X State ...) in GeographyPanel
+- (v1.2) PMTiles updated for each year (actually not too difficult)
 - (v1.2+) Add graphs/charts (because they are pretty)
 
 ### New Features
 
+- (v1.1; complete) Data ingestion pipeline through online DAT files rather than raw census reporter dump
 - (v1.2) Add percentile ranks for attributes
 - (v1.2) Add separate pages for leaderboards (e.g., top places by education index)
 - (v1.2+) Compare two or more geographies
@@ -334,8 +346,7 @@ $$
 
 _These are also in GitHub Issues_
 
-- (fixed 2026-03-18) Medium Priority: Disconnected from WiFi on iPhone browser (leaving LAN), then attempted to load a geography. Got stuck on "Loading" forever. Upon reconnect page immediately refreshed and was fine. Not sure what this means for "normal connection lost". (Addendum: also tested "API server is just down" and it worked normally. The weird behavior was only when disconnected from LAN.)
-- (v1.1) Low Priority: If an offline error occurred, trying to load the same GEOID will not trigger anything even if network reconnects. User can load another geography then go back to the original one and both will work, it's just the initial state seems to be stuck if you try to reload same one.
+- (v1.1) Low Priority: If an offline error occurred, trying to load the same GEOID will not trigger anything even if network reconnects. User can load another geography then go back to the original one and both will work, it's just the initial state seems to be stuck if you try to reload same one. This is caused by general behavior of not being able to refresh currently geo.
 
 ## Acknowledgements
 

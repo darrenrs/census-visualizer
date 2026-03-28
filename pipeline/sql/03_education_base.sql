@@ -91,26 +91,18 @@ SELECT
   viz.clean_int(edu.b15002035)               AS edu_doctorate_degree_f,
   (viz.clean_dec(edu.b15002035_moe) / 1.645) AS edu_doctorate_degree_f_se
 FROM viz.geoid_base g
-LEFT JOIN :"vintage".b15002_moe edu USING (geoid)
+LEFT JOIN raw.b15002_moe edu
+  ON edu.vintage = g.vintage
+ AND edu.geoid = g.geoid
 WHERE g.vintage = :'vintage';
 
 CREATE TABLE IF NOT EXISTS viz.education_base (
-  LIKE tmp_education_base INCLUDING DEFAULTS
+  LIKE tmp_education_base INCLUDING DEFAULTS,
+  PRIMARY KEY (vintage, geoid)
 );
 
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'education_base_pkey'
-      AND conrelid = 'viz.education_base'::regclass
-  ) THEN
-    ALTER TABLE viz.education_base
-    ADD CONSTRAINT education_base_pkey PRIMARY KEY (vintage, sumlevel, geoid);
-  END IF;
-END
-$$;
+CREATE INDEX IF NOT EXISTS education_base_vintage_sumlevel_idx
+ON viz.education_base (vintage, sumlevel);
 
 DELETE FROM viz.education_base
 WHERE vintage = :'vintage';

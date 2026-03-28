@@ -39,29 +39,27 @@ SELECT
   viz.clean_dec(gini.b19083001)               AS hhi_gini,
   (viz.clean_dec(gini.b19083001_moe) / 1.645) AS hhi_gini_se
 FROM viz.geoid_base g
-LEFT JOIN :"vintage".b19013_moe hhi USING (geoid)
-LEFT JOIN :"vintage".b19080_moe quintile_thresh USING (geoid)
-LEFT JOIN :"vintage".b19081_moe quintile_avg USING (geoid)
-LEFT JOIN :"vintage".b19083_moe gini USING (geoid)
+LEFT JOIN raw.b19013_moe hhi
+  ON hhi.vintage = g.vintage
+ AND hhi.geoid = g.geoid
+LEFT JOIN raw.b19080_moe quintile_thresh
+  ON quintile_thresh.vintage = g.vintage
+ AND quintile_thresh.geoid = g.geoid
+LEFT JOIN raw.b19081_moe quintile_avg
+  ON quintile_avg.vintage = g.vintage
+ AND quintile_avg.geoid = g.geoid
+LEFT JOIN raw.b19083_moe gini
+  ON gini.vintage = g.vintage
+ AND gini.geoid = g.geoid
 WHERE g.vintage = :'vintage';
 
 CREATE TABLE IF NOT EXISTS viz.income_base (
-  LIKE tmp_income_base INCLUDING DEFAULTS
+  LIKE tmp_income_base INCLUDING DEFAULTS,
+  PRIMARY KEY (vintage, geoid)
 );
 
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'income_base_pkey'
-      AND conrelid = 'viz.income_base'::regclass
-  ) THEN
-    ALTER TABLE viz.income_base
-    ADD CONSTRAINT income_base_pkey PRIMARY KEY (vintage, sumlevel, geoid);
-  END IF;
-END
-$$;
+CREATE INDEX IF NOT EXISTS income_base_vintage_sumlevel_idx
+ON viz.income_base (vintage, sumlevel);
 
 DELETE FROM viz.income_base
 WHERE vintage = :'vintage';

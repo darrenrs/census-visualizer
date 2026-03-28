@@ -1,6 +1,7 @@
 # config/data
 **/.env
-pipeline/vre/*/
+pipeline/ingest/work/
+pipeline/vre/work/
 pipeline/geo/**
 !pipeline/geo/**/*.sh
 

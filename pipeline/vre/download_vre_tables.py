@@ -8,6 +8,7 @@ from urllib.request import Request, urlopen
 from dotenv import load_dotenv
 
 VRE_DIR = Path(__file__).resolve().parent
+WORK_DIR = VRE_DIR / 'work'
 
 tables = [
   'B15002',  # Sex by Educational Attainment
@@ -56,8 +57,12 @@ def parse_vintage(vintage: str) -> tuple[int, str]:
   return year, period
 
 
+def vintage_work_dir(vintage: str) -> Path:
+  return WORK_DIR / vintage
+
+
 def download_and_extract(
-  year: int, period: str, table: str, sumlvl: str, statecode: str = ''
+  year: int, period: str, table: str, sumlvl: str, out_dir: Path, statecode: str = ''
 ) -> None:
   statecode_inline = ''
   if statecode != '':
@@ -67,7 +72,6 @@ def download_and_extract(
     f'https://www2.census.gov/programs-surveys/acs/replicate_estimates/'
     f'{year}/data/{period}/{sumlvl}/{table}{statecode_inline}.csv.zip'
   )
-  out_dir = VRE_DIR / table
   out_dir.mkdir(parents=True, exist_ok=True)
   out_path = out_dir / f'{sumlvl}{statecode_inline}.csv'
 
@@ -85,8 +89,7 @@ def download_and_extract(
       dst.write(src.read())
 
 
-def concatenate_csv_in_dir(table: str, sumlvl: str) -> None:
-  table_dir = VRE_DIR / table
+def concatenate_csv_in_dir(table_dir: Path, sumlvl: str) -> None:
   out_path = table_dir / f'{sumlvl}.csv'
   parts = sorted(p for p in table_dir.glob(f'{sumlvl}_*.csv') if p.is_file())
 
@@ -117,21 +120,24 @@ if __name__ == '__main__':
     raise RuntimeError('VINTAGE not set (set in .env or environment.)')
 
   year, period = parse_vintage(vintage)
+  work_dir = vintage_work_dir(vintage)
 
-  for i in tables:
-    for j in sumlvls_all:
+  for table in tables:
+    table_dir = work_dir / table
+
+    for sumlevel in sumlvls_all:
       try:
-        download_and_extract(year, period, i, j)
+        download_and_extract(year, period, table, sumlevel, table_dir)
       except Exception as e:
-        print(f'Failed to download or extract {i}/{j}: {e}')
+        print(f'Failed to download or extract {table}/{sumlevel}: {e}')
 
-    for j in sumlvls_state:
-      for k in statecodes:
+    for sumlevel in sumlvls_state:
+      for statecode in statecodes:
         try:
-          download_and_extract(year, period, i, j, k)
+          download_and_extract(year, period, table, sumlevel, table_dir, statecode)
         except Exception as e:
-          print(f'Failed to download or extract {i}/{j}_{k}: {e}')
+          print(f'Failed to download or extract {table}/{sumlevel}_{statecode}: {e}')
       try:
-        concatenate_csv_in_dir(i, j)
+        concatenate_csv_in_dir(table_dir, sumlevel)
       except Exception as e:
-        print(f'Failed to concatenate {i}/{j}: {e}')
+        print(f'Failed to concatenate {table}/{sumlevel}: {e}')

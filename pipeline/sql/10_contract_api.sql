@@ -20,7 +20,8 @@ VALUES
   (160, 'Place', 'Incorporated Place/CDP', 'Incorporated place or Census Designated Place (CDP)'),
   (310, 'CBSA', 'Metropolitan/Micropolitan Area', 'Metropolitan or Micropolitan Statistical Area (CBSA)'),
   (500, 'Congressional District', 'Congressional District (119th Congress)', 'State-congressional district (119th Congress for ACS 2024)'),
-  (860, 'ZCTA', 'ZIP Code Tabulation Area', 'ZIP Code Tabulation Area (near-equivalent of USPS ZIP Code service areas)');
+  (860, 'ZCTA', 'ZIP Code Tabulation Area', 'ZIP Code Tabulation Area (near-equivalent of USPS ZIP Code service areas)')
+ON CONFLICT (sumlevel) DO NOTHING;
 
 CREATE OR REPLACE VIEW api.geoid_v1 AS
 SELECT
@@ -171,11 +172,9 @@ SELECT
  FROM viz.geoid_base g
  JOIN viz.income_base b
    ON b.vintage = g.vintage
-  AND b.sumlevel = g.sumlevel
   AND b.geoid = g.geoid
  JOIN viz.income_derived d
    ON d.vintage = g.vintage
-  AND d.sumlevel = g.sumlevel
   AND d.geoid = g.geoid;
 
 CREATE OR REPLACE VIEW api.education_v1 AS
@@ -233,7 +232,6 @@ SELECT
  FROM viz.geoid_base g
  JOIN viz.education_derived d
    ON d.vintage = g.vintage
-  AND d.sumlevel = g.sumlevel
   AND d.geoid = g.geoid;
 
 CREATE OR REPLACE VIEW api.diversity_v1 AS
@@ -272,7 +270,6 @@ SELECT
  FROM viz.geoid_base g
  JOIN viz.diversity_derived d
    ON d.vintage = g.vintage
-  AND d.sumlevel = g.sumlevel
   AND d.geoid = g.geoid;
 
 CREATE OR REPLACE VIEW api.occupation_v1 AS
@@ -345,5 +342,4 @@ SELECT
  FROM viz.geoid_base g
  JOIN viz.occupation_derived d
    ON d.vintage = g.vintage
-  AND d.sumlevel = g.sumlevel
   AND d.geoid = g.geoid;

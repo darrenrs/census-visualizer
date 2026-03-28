@@ -30,8 +30,11 @@ CREATE TABLE IF NOT EXISTS viz.occupation_derived (
   -- Used for data quality purposes
   flags                           integer NOT NULL default 0,
 
-  PRIMARY KEY (vintage, sumlevel, geoid)
+  PRIMARY KEY (vintage, geoid)
 );
+
+CREATE INDEX IF NOT EXISTS occupation_derived_vintage_sumlevel_idx
+  ON viz.occupation_derived (vintage, sumlevel);
 """
 
 QUERY_RESET_TABLE = 'DELETE FROM viz.occupation_derived WHERE vintage = %s;'
@@ -167,7 +170,6 @@ SELECT
 FROM viz.occupation_base b
 JOIN viz.geoid_base g
   ON g.vintage  = b.vintage
- AND g.sumlevel = b.sumlevel
  AND g.geoid    = b.geoid
 WHERE b.vintage = %s;
 """
@@ -203,7 +205,6 @@ SET
   occ_occupation_index_ratio_hi90 = t.occ_occupation_index_ratio_hi90
 FROM tmp_occupation_derived t
 WHERE d.vintage  = t.vintage
-  AND d.sumlevel = t.sumlevel
   AND d.geoid    = t.geoid
   AND (d.flags & %s) = 0;
 """
@@ -421,7 +422,7 @@ def main() -> None:
       rows_buf = []
 
       # load VRE tables
-      vre_base_path = Path(__file__).parent.parent / 'vre' / ACS_TABLE_CODE
+      vre_base_path = Path(__file__).parent.parent / 'vre' / 'work' / vintage / ACS_TABLE_CODE
 
       for sumlevel in VRE_SUMLVLS:
         path = vre_base_path / f'{sumlevel}.csv'
