@@ -19,7 +19,7 @@ from raw_manifest import (
 )
 
 SUMMARY_FILE_ROOT = 'https://www2.census.gov/programs-surveys/acs/summary_file'
-SUMMARY_FILE_START_YEAR = 2018
+SUMMARY_FILE_START_YEAR = 2020
 DOWNLOAD_TIMEOUT_SECONDS = 60
 WORK_ROOT = Path(__file__).resolve().parent / 'work'
 USER_AGENT = 'census-visualizer'

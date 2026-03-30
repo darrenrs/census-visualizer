@@ -21,7 +21,7 @@ A sample `.env` file is provided at `.env.example`.
 - `DATABASE_URL` for the target Postgres database connection URL
 - `SOURCE_DATABASE_URL` optional source Postgres database URL for sql-based raw ingest
 - `RAW_INGEST_MODE` with `dump|sql`
-  - `dump` downloads official ACS Summary File `.dat` files from 2018 and newer to `pipeline/ingest/work/<VINTAGE>` (strongly recommended)
+  - `dump` downloads official ACS Summary File `.dat` files from 2020 and newer to `pipeline/ingest/work/<VINTAGE>` (strongly recommended)
   - `sql` uses a PostgreSQL server with a loaded Census Reporter database dump
   - Note: `VINTAGE` influences raw ACS ingest, downstream pipeline output, and VRE estimates; you'll still need to manually update the URLs in `pipeline/geo/build_geo.sh` for a different set of geography tiles
 - `PORT_SERVER` for API server
@@ -46,7 +46,7 @@ From a clean slate this entire process will take about 30 min to complete. Teste
 1. Ensure Postgres is installed.
 2. Choose a raw ingest path:
    - SQL mode: set `RAW_INGEST_MODE=sql`, load the Census Reporter ACS dump into a schema named after `VINTAGE`, then run `python3 pipeline/ingest/ingest_sql.py`.
-   - Dump mode: set `RAW_INGEST_MODE=dump`, then run `python3 pipeline/ingest/ingest_dump.py` to download and load official ACS Summary File `.dat` files for `acs2018_5yr` and newer.
+   - Dump mode: set `RAW_INGEST_MODE=dump`, then run `python3 pipeline/ingest/ingest_dump.py` to download and load official ACS Summary File `.dat` files for `acs2020_5yr` and newer.
 3. Run `python3 pipeline/vre/download_vre_tables.py`.
    This writes per-vintage VRE files under `pipeline/vre/work/<VINTAGE>/<TABLE>/`.
 4. Run each of the scripts in `pipeline/sql` and `pipeline/python` in order based on their number.
@@ -136,7 +136,7 @@ _Median and selected percentile ranks (observed and extrapolated via Pareto func
 
 - Median Household Income (B19013)
 - Household Income Thresholds at percentiles 20, 40, 60, 80, and 95 (B19080)
-  - _Census topcodes values above $250,000 as "250001" and are effectively unusable as point estimates_
+  - _Census topcodes values above \$250,000 as "250001" and are effectively unusable as point estimates_
 - Mean Household Income of quintiles 2, 3, 4, 5 and top 5% (B19081)
   - _These values are not topcoded and can be used_
 - Gini Index of Income Inequality (B19083)
@@ -317,30 +317,41 @@ $$
 \frac{\mathrm{OccExt}}{\mathrm{OccRoot}}
 $$
 
-## Todo (2026-03-18)
+## Todo (2026-03-29)
 
-## Improvements
+### v1.1
 
-- (v1.1) Remove pipeline file names having numbers
-- (v1.1) Add window title
-- (v1.1) Add basic favicon
-- (v1.1) Show `state_code` in GeographyPanel
-- (v1.1) Add simple geography search
-- (v1.2) Add address geocoder from Census Geocoder API
-- (v1.2) Much more detailed about page with math explanations
-- (v1.2) Show full path (block group in X County, in X State ...) in GeographyPanel
-- (v1.2) PMTiles updated for each year (actually not too difficult)
-- (v1.2+) Add graphs/charts (because they are pretty)
+#### Minor Improvements/Cleanup
 
-### New Features
+- (complete) Data ingestion pipeline through official Summary Files rather than raw census reporter dump
+- PMTiles for each year/vintage
+- Pipeline file names should no longer have numbers
+- Add window title
+- Add basic favicon
+- Show `state_code` in GeographyPanel
+- Link GEOID to Census Reporter
 
-- (v1.1; complete) Data ingestion pipeline through online DAT files rather than raw census reporter dump
-- (v1.2) Add percentile ranks for attributes
-- (v1.2) Add separate pages for leaderboards (e.g., top places by education index)
-- (v1.2+) Compare two or more geographies
-- (v1.2+) Compare two or more years
-- (v1.2+) Add more attributes
-- (v1.3) Introduce clustering algorithms (branching into ML now)
+#### New Features
+
+- Add simple geography search
+- Add address geocoder from Census Geocoder API
+- Much more technically detailed about page
+
+### v1.2
+
+- Show full path (block group in X County, in X State ...) in GeographyPanel
+- Add percentile ranks for attributes
+- Add separate pages for leaderboards grouped by sumlevel (e.g., top places by education index)
+- Compare two or more geographies
+- Compare two or more years
+
+### Proposed Ideas
+
+- Consider adding more attributes
+- Introduce geography clustering algorithms
+- Add graphs/charts (because they are pretty)
+
+### Significant New Features
 
 ### Bugs
 
@@ -352,3 +363,7 @@ _These are also in GitHub Issues_
 
 - U.S. Census Bureau
 - Census Reporter
+
+## License
+
+Copyright (C) 2026 Darren R. Skidmore. This software is licensed under the MIT License.
