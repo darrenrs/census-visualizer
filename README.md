@@ -145,23 +145,23 @@ _Median and selected percentile ranks (observed and extrapolated via Pareto func
 
 Illustrative Pareto tail model:
 
-$$
+```math
 \Pr(X \ge x) = \left(\frac{x_m}{x}\right)^\alpha
 \quad \text{for } x \ge x_m,\ \alpha > 0
-$$
+```
 
 which implies the corresponding quantile function:
 
-$$
+```math
 Q(p) = \frac{x_m}{(1-p)^{1/\alpha}}
 \quad \text{for } 0 < p < 1
-$$
+```
 
 In the simulation code, this is reparameterized as:
 
-$$
+```math
 \frac{\mu_s - T_s}{\mu_s} = \frac{1}{\alpha}
-$$
+```
 
 where $T_s$ is a simulated threshold draw and $\mu_s$ is a simulated conditional mean draw above that threshold.
 
@@ -169,19 +169,19 @@ Examples of what gets plugged in from the pipeline:
 
 - Standard upper-tail fit above the 95th percentile:
   - $p_0 = 0.95$
-  - $T = \texttt{hhi\_p95}$
-  - $\mu = \texttt{hhi\_top5\_mean}$
+  - $T = \mathtt{hhi\_p95}$
+  - $\mu = \mathtt{hhi\_top5\_mean}$
 - Standard upper-tail fit above the 80th percentile:
   - $p_0 = 0.80$
-  - $T = \texttt{hhi\_p80}$
-  - $\mu = \texttt{hhi\_q5\_mean}$
+  - $T = \mathtt{hhi\_p80}$
+  - $\mu = \mathtt{hhi\_q5\_mean}$
 - Means-only fallback when observed upper quantiles are topcoded:
-  - $\mu_{80} = \texttt{hhi\_q5\_mean}$
-  - $\mu_{95} = \texttt{hhi\_top5\_mean}$
+  - $\mu_{80} = \mathtt{hhi\_q5\_mean}$
+  - $\mu_{95} = \mathtt{hhi\_top5\_mean}$
   - then infer a latent $P_{80}$ and extrapolate the tail from there
 - Segment repair for the 80th to 95th percentile range:
-  - $T_{\mathrm{lo}} = \texttt{hhi\_p80}$
-  - $T_{\mathrm{hi}} = \texttt{hhi\_p95}$
+  - $T_{\mathrm{lo}} = \mathtt{hhi\_p80}$
+  - $T_{\mathrm{hi}} = \mathtt{hhi\_p95}$
   - $p_{\mathrm{lo}} = 0.80$
   - $p_{\mathrm{hi}} = 0.95$
   - use this segment to estimate $P_{90}$
@@ -198,36 +198,36 @@ _Normalized index in the range 0-100, plus estimated years of schooling. Confide
 
 Illustrative weighted-attainment formula:
 
-$$
+```math
 \mathrm{EI}
 =
 \frac{\sum_n w_n \left(M_n + F_n\right)}
 {\sum_n \left(M_n + F_n\right)}
-$$
+```
 
 where $M_n$ and $F_n$ are the male and female counts in attainment bucket $n$.
 
 In the pipeline, this is implemented with explicit bucket weights such as:
 
-$$
+```math
 \frac{
-0.00(\texttt{edu\_no\_schooling\_m} + \texttt{edu\_no\_schooling\_f})
- + 0.10(\texttt{edu\_grade\_0\_4\_m} + \texttt{edu\_grade\_0\_4\_f})
+0.00(\mathtt{edu\_no\_schooling\_m} + \mathtt{edu\_no\_schooling\_f})
+ + 0.10(\mathtt{edu\_grade\_0\_4\_m} + \mathtt{edu\_grade\_0\_4\_f})
  + \cdots
- + 3.00(\texttt{edu\_doctorate\_degree\_m} + \texttt{edu\_doctorate\_degree\_f})
+ + 3.00(\mathtt{edu\_doctorate\_degree\_m} + \mathtt{edu\_doctorate\_degree\_f})
 }{
-\texttt{edu\_population}
+\mathtt{edu\_population}
 }
-$$
+```
 
 Estimated years of schooling uses the same structure with year-based weights instead of normalized education-index weights:
 
-$$
+```math
 \mathrm{YOS}
 =
 \frac{\sum_n y_n \left(M_n + F_n\right)}
 {\sum_n \left(M_n + F_n\right)}
-$$
+```
 
 ### Racial/Ethnic Diversity
 
@@ -241,30 +241,30 @@ _Normalized index in the range 0-100. Confidence intervals derived from Variance
 
 Illustrative Simpson diversity formula:
 
-$$
+```math
 D = 1 - \sum_k p_k^2
-$$
+```
 
 where $p_k = c_k / N$ is the share of category $k$ in the total population $N$.
 
 In the pipeline, this is implemented as:
 
-$$
+```math
 D
 =
 1
 -
 \frac{
-\texttt{race\_white\_nh}^2
-+ \texttt{race\_black\_nh}^2
-+ \texttt{race\_aian\_nh}^2
-+ (\texttt{race\_asian\_nh} + \texttt{race\_nhpi\_nh})^2
-+ (\texttt{race\_other\_nh} + \texttt{race\_multi\_nh})^2
-+ \texttt{race\_hispanic}^2
+\mathtt{race\_white\_nh}^2
++ \mathtt{race\_black\_nh}^2
++ \mathtt{race\_aian\_nh}^2
++ (\mathtt{race\_asian\_nh} + \mathtt{race\_nhpi\_nh})^2
++ (\mathtt{race\_other\_nh} + \mathtt{race\_multi\_nh})^2
++ \mathtt{race\_hispanic}^2
 }{
-\texttt{total\_population}^2
+\mathtt{total\_population}^2
 }
-$$
+```
 
 ### Occupational Diversity
 
@@ -278,44 +278,44 @@ _Five root occupational groups, twenty-five leaf occupational groups, ratio of b
 
 Illustrative Hill-number concentration formula:
 
-$$
+```math
 H = \frac{1}{\sum_k p_k^2}
 =
 \frac{N^2}{\sum_k c_k^2}
-$$
+```
 
 where $c_k$ is the count in occupation category $k$ and $N$ is the total employed population represented by the table.
 
 In the pipeline, the root occupation index is implemented as:
 
-$$
+```math
 \mathrm{OccRoot}
 =
-\frac{\texttt{occ\_population}^2}{
+\frac{\mathtt{occ\_population}^2}{
 \sum_{k \in \text{5 root groups}} (M_k + F_k)^2
 }
-$$
+```
 
 and the extended occupation index is:
 
-$$
+```math
 \mathrm{OccExt}
 =
-\frac{\texttt{occ\_population}^2}{
+\frac{\mathtt{occ\_population}^2}{
 \sum_{k \in \text{25 leaf groups}} (M_k + F_k)^2
 }
-$$
+```
 
 The reported occupation ratio is then:
 
-$$
+```math
 \mathrm{OccRatio}
 =
 \frac{\sum_{k \in \text{5 root groups}} (M_k + F_k)^2}
 {\sum_{k \in \text{25 leaf groups}} (M_k + F_k)^2}
 =
 \frac{\mathrm{OccExt}}{\mathrm{OccRoot}}
-$$
+```
 
 ## Todo (2026-03-29)
 
@@ -324,6 +324,7 @@ $$
 #### Minor Improvements/Cleanup
 
 - (complete) Data ingestion pipeline through official Summary Files rather than raw census reporter dump
+- (complete) fix LaTeX not rendering properly on GitHub
 - PMTiles for each year/vintage
 - Pipeline file names should no longer have numbers
 - Add window title
