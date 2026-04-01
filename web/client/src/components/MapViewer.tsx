@@ -5,6 +5,7 @@ import { type Sumlevel } from "@/types/api.ts";
 
 type MapViewerProps = {
   sumlevel: Sumlevel;
+  vintage: string | null;
   onSelectGeoid: (geoid: string) => void;
   selectedGeoid: string | null;
 };
@@ -52,6 +53,7 @@ function zoomsForSumlevel(sumlevel: Sumlevel) {
 export function MapViewer({
   onSelectGeoid,
   sumlevel,
+  vintage,
   selectedGeoid,
 }: MapViewerProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -75,7 +77,9 @@ export function MapViewer({
         ? `${window.location.origin}${geoBaseRaw}`
         : geoBaseRaw;
   const normalizedSumlevel = normalizeSumlevel(sumlevel);
-  const geographiesPmtilesUrl = `${geoBase}/pmtiles/${normalizedSumlevel}.pmtiles`;
+  const geographiesPmtilesUrl = vintage
+    ? `${geoBase}/${vintage}/pmtiles/${normalizedSumlevel}.pmtiles`
+    : null;
   const sourceLayer = `geo_${normalizedSumlevel}`;
   const zoomRange = zoomsForSumlevel(sumlevel);
   const isHoverMode =
@@ -143,6 +147,7 @@ export function MapViewer({
 
     const map = mapRef.current;
     if (!map) return;
+    if (!geographiesPmtilesUrl) return;
 
     const hideTooltip = () => {
       setTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));

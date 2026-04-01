@@ -17,13 +17,12 @@ An ETL pipeline + full-stack website that presents Census data and custom metric
 
 A sample `.env` file is provided at `.env.example`.
 
-- `VINTAGE` for primary/active ACS vintage ID (e.g., `acs2024_5yr`)
+- `VINTAGE` for primary/active ACS vintage ID (e.g., `acs2024_5yr`.) The minimum officially supported vintage is `acs2020_5yr`, but with heavy modifications the pipeline could theoretically work as early as `acs2014_5yr`.
 - `DATABASE_URL` for the target Postgres database connection URL
 - `SOURCE_DATABASE_URL` optional source Postgres database URL for sql-based raw ingest
 - `RAW_INGEST_MODE` with `dump|sql`
-  - `dump` downloads official ACS Summary File `.dat` files from 2020 and newer to `pipeline/ingest/work/<VINTAGE>` (strongly recommended)
+  - `dump` downloads official ACS Summary File `.dat` files to `pipeline/ingest/work/<VINTAGE>` (strongly recommended)
   - `sql` uses a PostgreSQL server with a loaded Census Reporter database dump
-  - Note: `VINTAGE` influences raw ACS ingest, downstream pipeline output, and VRE estimates; you'll still need to manually update the URLs in `pipeline/geo/build_geo.sh` for a different set of geography tiles
 - `PORT_SERVER` for API server
 - `PORT_CLIENT` for Vite dev server
 - `VITE_BASE_PATH` for frontend mount path
@@ -31,6 +30,8 @@ A sample `.env` file is provided at `.env.example`.
 - `VITE_GEO_BASE` for browser geo asset base path (local `/geo` or remote URL)
 - `GEO_ASSET_MODE` with `local|remote` (Express serves local geo only when `local`)
 - `GEO_ASSET_DIR` local directory mounted to `VITE_GEO_BASE` (default `pipeline/geo/out`)
+
+The `.env` file must be shell-safe for certain scripts to run (e.g., no inline comments.)
 
 ### Running the Pipeline
 
@@ -46,7 +47,7 @@ From a clean slate this entire process will take about 30 min to complete. Teste
 1. Ensure Postgres is installed.
 2. Choose a raw ingest path:
    - SQL mode: set `RAW_INGEST_MODE=sql`, load the Census Reporter ACS dump into a schema named after `VINTAGE`, then run `python3 pipeline/ingest/ingest_sql.py`.
-   - Dump mode: set `RAW_INGEST_MODE=dump`, then run `python3 pipeline/ingest/ingest_dump.py` to download and load official ACS Summary File `.dat` files for `acs2020_5yr` and newer.
+   - Dump mode: set `RAW_INGEST_MODE=dump`, then run `python3 pipeline/ingest/ingest_dump.py` to download and load official ACS Summary File `.dat` files.
 3. Run `python3 pipeline/vre/download_vre_tables.py`.
    This writes per-vintage VRE files under `pipeline/vre/work/<VINTAGE>/<TABLE>/`.
 4. Run each of the scripts in `pipeline/sql` and `pipeline/python` in order based on their number.
@@ -325,12 +326,13 @@ The reported occupation ratio is then:
 
 - (complete) Data ingestion pipeline through official Summary Files rather than raw census reporter dump
 - (complete) fix LaTeX not rendering properly on GitHub
-- PMTiles for each year/vintage
+- (complete) PMTiles for each year/vintage
 - Pipeline file names should no longer have numbers
 - Add window title
 - Add basic favicon
 - Show `state_code` in GeographyPanel
 - Link GEOID to Census Reporter
+- (bug) If an offline error occurred, trying to load the same GEOID will not trigger anything even if network reconnects. User can load another geography then go back to the original one and both will work, it's just the initial state seems to be stuck if you try to reload same one. This is caused by general behavior of not being able to refresh currently geo.
 
 #### New Features
 
@@ -346,19 +348,11 @@ The reported occupation ratio is then:
 - Compare two or more geographies
 - Compare two or more years
 
-### Proposed Ideas
+### Proposed
 
 - Consider adding more attributes
 - Introduce geography clustering algorithms
 - Add graphs/charts (because they are pretty)
-
-### Significant New Features
-
-### Bugs
-
-_These are also in GitHub Issues_
-
-- (v1.1) Low Priority: If an offline error occurred, trying to load the same GEOID will not trigger anything even if network reconnects. User can load another geography then go back to the original one and both will work, it's just the initial state seems to be stuck if you try to reload same one. This is caused by general behavior of not being able to refresh currently geo.
 
 ## Acknowledgements
 

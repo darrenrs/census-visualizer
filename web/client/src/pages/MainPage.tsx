@@ -265,6 +265,8 @@ export default function MainPage() {
     ...(panelWidth ? { "--panel-width": `${panelWidth}px` } : {}),
     ...(mapHeight ? { "--map-height": `${mapHeight}px` } : {}),
   } as CSSProperties;
+  const activeVintage =
+    geographyResponse?.geography.vintage ?? geographyListResponse?.vintage ?? null;
 
   return (
     <div className="app-shell">
@@ -290,6 +292,7 @@ export default function MainPage() {
         <MapViewer
           onSelectGeoid={updateHash}
           sumlevel={activeSumlevel}
+          vintage={activeVintage}
           selectedGeoid={geoidFromHash}
         />
         <SumlevelSelector

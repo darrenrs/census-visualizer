@@ -3,15 +3,39 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 GEO_DIR="$ROOT_DIR/pipeline/geo"
-WORK_DIR="$GEO_DIR/work"
+ROOT_ENV_FILE="$ROOT_DIR/.env"
+
+if [[ -f "$ROOT_ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ROOT_ENV_FILE"
+  set +a
+fi
+
+if [[ -z "${DATABASE_URL:-}" ]]; then
+  echo "DATABASE_URL is required. Set it in environment or $ROOT_ENV_FILE." >&2
+  exit 1
+fi
+
+if [[ -z "${VINTAGE:-}" ]]; then
+  echo "VINTAGE is required (set in .env or environment)." >&2
+  exit 1
+fi
+
+if [[ ! "$VINTAGE" =~ ^acs([0-9]{4})_[15]yr$ ]]; then
+  echo "VINTAGE must look like acs2024_5yr or acs2023_1yr. Received: $VINTAGE" >&2
+  exit 1
+fi
+
+VINTAGE_YEAR="${BASH_REMATCH[1]}"
+WORK_DIR="$GEO_DIR/work/$VINTAGE"
 ZIP_DIR="$WORK_DIR/zips"
 RAW_DIR="$WORK_DIR/raw"
 MBTILES_DIR="$WORK_DIR/mbtiles"
 GEOID_WORK_DIR="$WORK_DIR/geoid"
-OUT_DIR="$GEO_DIR/out"
+OUT_DIR="$GEO_DIR/out/$VINTAGE"
 OUT_GEOJSON_DIR="$OUT_DIR/geojson"
 OUT_PMTILES_DIR="$OUT_DIR/pmtiles"
-ROOT_ENV_FILE="$ROOT_DIR/.env"
 
 mkdir -p \
   "$ZIP_DIR" \
@@ -34,37 +58,54 @@ require_cmd ogrinfo
 require_cmd ogr2ogr
 require_cmd psql
 
-if [[ -f "$ROOT_ENV_FILE" ]]; then
-  set -a
-  # shellcheck disable=SC1090
-  source "$ROOT_ENV_FILE"
-  set +a
-fi
+cd_suffix_for_year() {
+  local year="$1"
+  case "$year" in
+    2020|2021) echo "116" ;;
+    2022|2023) echo "118" ;;
+    2024|2025) echo "119" ;;
+    *)
+      echo "Unsupported congressional district vintage year: $year" >&2
+      exit 1
+      ;;
+  esac
+}
 
-if [[ -z "${DATABASE_URL:-}" ]]; then
-  echo "DATABASE_URL is required. Set it in environment or $ROOT_ENV_FILE." >&2
-  exit 1
-fi
+map_url() {
+  local year="$1"
+  local sumlevel="$2"
+  local root="https://www2.census.gov/geo/tiger"
 
-if [[ -z "${VINTAGE:-}" ]]; then
-  echo "VINTAGE is required (set in .env or environment)." >&2
-  exit 1
-fi
+  case "$sumlevel" in
+    010) echo "$root/GENZ${year}/shp/cb_${year}_us_nation_5m.zip" ;;
+    040) echo "$root/GENZ${year}/shp/cb_${year}_us_state_500k.zip" ;;
+    050) echo "$root/GENZ${year}/shp/cb_${year}_us_county_500k.zip" ;;
+    060) echo "$root/GENZ${year}/shp/cb_${year}_us_cousub_500k.zip" ;;
+    140) echo "$root/GENZ${year}/shp/cb_${year}_us_tract_500k.zip" ;;
+    150) echo "$root/GENZ${year}/shp/cb_${year}_us_bg_500k.zip" ;;
+    160) echo "$root/GENZ${year}/shp/cb_${year}_us_place_500k.zip" ;;
+    310)
+      # Substituting 2021 CBSA boundaries for 2022 since the file is missing
+      if (( year == 2022 )); then
+        echo "$root/GENZ2021/shp/cb_2021_us_cbsa_500k.zip"
+      else
+        echo "$root/GENZ${year}/shp/cb_${year}_us_cbsa_500k.zip"
+      fi
+      ;;
+    500)
+      local cd_suffix
+      cd_suffix="$(cd_suffix_for_year "$year")"
+      echo "$root/GENZ${year}/shp/cb_${year}_us_cd${cd_suffix}_500k.zip"
+      ;;
+    860) echo "$root/GENZ2020/shp/cb_2020_us_zcta520_500k.zip" ;;
+    *)
+      echo "Unknown sumlevel: $sumlevel" >&2
+      exit 1
+      ;;
+  esac
+}
 
-# sumlevel|url
-# Updated through 2024 (ZCTA are still stuck in 2020)
-MAPS=(
-  "010|https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_us_nation_5m.zip"
-  "040|https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_us_state_500k.zip"
-  "050|https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_us_county_500k.zip"
-  "060|https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_us_cousub_500k.zip"
-  "140|https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_us_tract_500k.zip"
-  "150|https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_us_bg_500k.zip"
-  "160|https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_us_place_500k.zip"
-  "310|https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_us_cbsa_500k.zip"
-  "500|https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_us_cd119_500k.zip"
-  "860|https://www2.census.gov/geo/tiger/GENZ2020/shp/cb_2020_us_zcta520_500k.zip"
-)
+SUMLEVELS=(010 040 050 060 140 150 160 310 500 860)
 
 has_field() {
   local meta="$1"
@@ -72,8 +113,8 @@ has_field() {
   grep -Eiq "^[[:space:]]*${field}[[:space:]]*:" <<<"$meta"
 }
 
-for row in "${MAPS[@]}"; do
-  IFS="|" read -r sumlevel url <<<"$row"
+for sumlevel in "${SUMLEVELS[@]}"; do
+  url="$(map_url "$VINTAGE_YEAR" "$sumlevel")"
 
   zip_path="$ZIP_DIR/${sumlevel}.zip"
   raw_path="$RAW_DIR/${sumlevel}"

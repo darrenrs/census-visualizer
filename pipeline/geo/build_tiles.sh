@@ -21,10 +21,23 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 GEO_DIR="$ROOT_DIR/pipeline/geo"
+ROOT_ENV_FILE="$ROOT_DIR/.env"
 
-DEFAULT_GEOJSON_DIR="$GEO_DIR/out/geojson"
-DEFAULT_MBTILES_DIR="$GEO_DIR/work/mbtiles"
-DEFAULT_PMTILES_DIR="$GEO_DIR/out/pmtiles"
+if [[ -f "$ROOT_ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ROOT_ENV_FILE"
+  set +a
+fi
+
+if [[ -z "${VINTAGE:-}" ]]; then
+  echo "VINTAGE is required (set in .env or environment)." >&2
+  exit 1
+fi
+
+DEFAULT_GEOJSON_DIR="$GEO_DIR/out/$VINTAGE/geojson"
+DEFAULT_MBTILES_DIR="$GEO_DIR/work/$VINTAGE/mbtiles"
+DEFAULT_PMTILES_DIR="$GEO_DIR/out/$VINTAGE/pmtiles"
 
 GEOJSON_DIR="${GEOJSON_DIR:-$DEFAULT_GEOJSON_DIR}"
 MBTILES_DIR="${MBTILES_DIR:-$DEFAULT_MBTILES_DIR}"
