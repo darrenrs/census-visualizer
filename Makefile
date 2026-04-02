@@ -5,8 +5,19 @@ include .env
 export
 endif
 
-SQL_BASE_SCRIPTS := $(sort $(wildcard pipeline/sql/0[0-5]_*.sql))
-PYTHON_SCRIPTS := $(sort $(wildcard pipeline/python/[0-9][0-9]_*.py))
+SQL_BASE_SCRIPTS := \
+	pipeline/sql/init.sql \
+	pipeline/sql/geoid_base.sql \
+	pipeline/sql/income_base.sql \
+	pipeline/sql/education_base.sql \
+	pipeline/sql/diversity_base.sql \
+	pipeline/sql/occupation_base.sql
+
+PYTHON_SCRIPTS := \
+	pipeline/python/income_derived.py \
+	pipeline/python/education_derived.py \
+	pipeline/python/diversity_derived.py \
+	pipeline/python/occupation_derived.py
 
 .PHONY: help check-env doctor ingest ingest_dump ingest_sql vre sql_base python sql_contract geo tiles dev dev-server dev-client pipeline all
 
@@ -26,9 +37,9 @@ help:
 	@echo "    make vre           - Download VRE tables"
 	@echo
 	@echo "  Data Pipeline"
-	@echo "    make sql_base      - Run SQL base pipeline (00-05)"
-	@echo "    make python        - Run Python derived pipeline (06-09)"
-	@echo "    make sql_contract  - Run API contract SQL (10)"
+	@echo "    make sql_base      - Run SQL base pipeline"
+	@echo "    make python        - Run Python derived pipeline"
+	@echo "    make sql_contract  - Run API contract SQL"
 	@echo
 	@echo "  Geo Assets"
 	@echo "    make geo           - Build GeoJSON assets"
@@ -139,7 +150,7 @@ python: check-env
 
 sql_contract: check-env
 	@echo "==> Running API contract SQL"
-	psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -v vintage="$(VINTAGE)" -f pipeline/sql/10_contract_api.sql
+	psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -v vintage="$(VINTAGE)" -f pipeline/sql/contract_api.sql
 
 geo: check-env
 	@echo "==> Building GeoJSON assets"

@@ -50,7 +50,7 @@ From a clean slate this entire process will take about 30 min to complete. Teste
    - Dump mode: set `RAW_INGEST_MODE=dump`, then run `python3 pipeline/ingest/ingest_dump.py` to download and load official ACS Summary File `.dat` files.
 3. Run `python3 pipeline/vre/download_vre_tables.py`.
    This writes per-vintage VRE files under `pipeline/vre/work/<VINTAGE>/<TABLE>/`.
-4. Run each of the scripts in `pipeline/sql` and `pipeline/python` in order based on their number.
+4. Run each of the scripts in `pipeline/sql` and `pipeline/python` in order.
 5. Run `python3 pipeline/geo/build_geo.sh` (ensure dependencies are installed.)
 6. Run `python3 pipeline/geo/build_tiles.sh` (ensure dependencies are installed.)
 
@@ -318,7 +318,7 @@ The reported occupation ratio is then:
 \frac{\mathrm{OccExt}}{\mathrm{OccRoot}}
 ```
 
-## Todo (2026-03-29)
+## Todo (2026-04-01)
 
 ### v1.1
 
@@ -327,11 +327,11 @@ The reported occupation ratio is then:
 - (complete) Data ingestion pipeline through official Summary Files rather than raw census reporter dump
 - (complete) fix LaTeX not rendering properly on GitHub
 - (complete) PMTiles for each year/vintage
-- Pipeline file names should no longer have numbers
-- Add window title
-- Add basic favicon
-- Show `state_code` in GeographyPanel
-- Link GEOID to Census Reporter
+- (complete) Pipeline file names should no longer have numbers
+- (complete) Add window title
+- (complete) Add basic favicon
+- (complete) Show `state_code` in GeographyPanel
+- (complete) Link GEOID to Census Reporter
 - (bug) If an offline error occurred, trying to load the same GEOID will not trigger anything even if network reconnects. User can load another geography then go back to the original one and both will work, it's just the initial state seems to be stuck if you try to reload same one. This is caused by general behavior of not being able to refresh currently geo.
 
 #### New Features

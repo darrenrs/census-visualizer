@@ -12,6 +12,7 @@ import { SectionDiversity } from "@/components/sections/SectionDiversity.tsx";
 import { SectionEducation } from "@/components/sections/SectionEducation.tsx";
 import { SectionIncome } from "@/components/sections/SectionIncome.tsx";
 import { SectionOccupation } from "@/components/sections/SectionOccupation.tsx";
+import { stateCodeToName } from "@/lib/stateCodeToName.ts";
 
 type GeographyPanelProps = {
   geoid: string;
@@ -48,6 +49,7 @@ export function GeographyPanel({
     geographyListResponse?.geographies.find(
       (item) => item.sumlevel === geographyResponse?.geography.sumlevel,
     ) ?? null;
+  const stateName = stateCodeToName(geographyResponse?.geography.state_code);
 
   return (
     <aside ref={panelRef} className="detail-panel" aria-label="Details panel">
@@ -86,6 +88,11 @@ export function GeographyPanel({
                 {selectedGeographyType
                   ? selectedGeographyType.long_label
                   : "\u00A0"}
+                {geographyResponse.geography.state_code &&
+                geographyResponse.geography.sumlevel !== 10 &&
+                geographyResponse.geography.sumlevel !== 40
+                  ? ` in ${stateName}`
+                  : ""}
               </p>
               <p className={geographyError ? "panel-error" : undefined}>
                 {statusText ?? "\u00A0"}
@@ -95,6 +102,15 @@ export function GeographyPanel({
               <SectionEducation geographyResponse={geographyResponse} />
               <SectionDiversity geographyResponse={geographyResponse} />
               <SectionOccupation geographyResponse={geographyResponse} />
+              <br />
+              <a
+                href={`https://censusreporter.org/profiles/${geographyResponse.geography.geoid}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Click here for more information about this location on Census
+                Reporter.
+              </a>
             </>
           )}
         </div>

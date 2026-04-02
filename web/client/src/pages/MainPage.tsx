@@ -266,7 +266,9 @@ export default function MainPage() {
     ...(mapHeight ? { "--map-height": `${mapHeight}px` } : {}),
   } as CSSProperties;
   const activeVintage =
-    geographyResponse?.geography.vintage ?? geographyListResponse?.vintage ?? null;
+    geographyResponse?.geography.vintage ??
+    geographyListResponse?.vintage ??
+    null;
 
   return (
     <div className="app-shell">
